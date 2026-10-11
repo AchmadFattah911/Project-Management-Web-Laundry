@@ -15,11 +15,12 @@ use Inertia\Inertia;
 // ─────────────────────────────────────────────
 
 Route::get('/', function () {
-    return Inertia::render('home', [
+    return view('home', [
         'canLogin'    => Route::has('login'),
         'canRegister' => Route::has('register'),
     ]);
 })->name('home');
+
 
 
 // ─────────────────────────────────────────────
