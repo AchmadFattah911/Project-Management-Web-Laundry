@@ -33,30 +33,30 @@
                         <span class="text-xs font-bold text-sky-700 bg-sky-100 px-2.5 py-1 rounded-md">Self-Service</span>
                     </div>
 
-                    <h3 class="text-xl font-bold text-slate-900">Cuci Koin Mandiri</h3>
-                    <p class="text-xs text-slate-500 mt-1 mb-5">Mesin cuci komersial otomatis berkecepatan tinggi.</p>
+                    <h3 class="text-xl font-bold text-slate-900">Mesin Cuci (Self Service)</h3>
+                    <p class="text-xs text-slate-500 mt-1 mb-5">Mesin cuci koin mandiri untuk pakaian, sprei, atau bedcover.</p>
 
                     <div class="border-y border-slate-200/80 py-4 my-4">
                         <div class="flex items-baseline gap-1">
                             <span class="text-xs font-bold text-slate-500">Mulai</span>
                             <span class="text-3xl font-extrabold text-slate-900">Rp 10.000</span>
-                            <span class="text-xs text-slate-500 font-semibold">/ siklus (8kg)</span>
+                            <span class="text-xs text-slate-500 font-semibold">/ siklus cuci</span>
                         </div>
-                        <p class="text-[11px] text-amber-700 font-semibold mt-1">1 Koin = 1 Kali Cuci Bersih (35 Menit)</p>
+                        <p class="text-[11px] text-amber-700 font-semibold mt-1">Batas Muatan: Pakaian Max 6kg | Sprei/Selimut Max 3kg | Bedcover Max 1 Pcs</p>
                     </div>
 
                     <ul class="space-y-3 text-xs text-slate-600">
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Termasuk deterjen cair premium otomatis</span>
+                            <span>Self Service - Mesin Cuci Otomatis</span>
                         </li>
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Air filter ultra-bersih tanpa bau kaporit</span>
+                            <span>Tanpa Sabun (Deterjen disiapkan sendiri / dibeli terpisah)</span>
                         </li>
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Privasi terjaga, baju tidak dicampur orang lain</span>
+                            <span>Hemat, cepat, dan higienis</span>
                         </li>
                     </ul>
                 </div>
@@ -85,22 +85,22 @@
                         <span class="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-md">Kering 100%</span>
                     </div>
 
-                    <h3 class="text-xl font-bold text-slate-900">Pengering Koin (Dryer)</h3>
-                    <p class="text-xs text-slate-500 mt-1 mb-5">Mesin pemanas gas komersial anti-bakteri.</p>
+                    <h3 class="text-xl font-bold text-slate-900">Mesin Pengering (Self Service)</h3>
+                    <p class="text-xs text-slate-500 mt-1 mb-5">Mesin pengering koin komersial anti-bakteri.</p>
 
                     <div class="border-y border-slate-100 py-4 my-4">
                         <div class="flex items-baseline gap-1">
                             <span class="text-xs font-bold text-slate-500">Mulai</span>
-                            <span class="text-3xl font-extrabold text-slate-900">Rp 10.000</span>
-                            <span class="text-xs text-slate-500 font-semibold">/ siklus (40 Menit)</span>
+                            <span class="text-3xl font-extrabold text-slate-900">Rp 20.000</span>
+                            <span class="text-xs text-slate-500 font-semibold">/ siklus kering</span>
                         </div>
-                        <p class="text-[11px] text-slate-600 font-medium mt-1">Langsung kering tuntas, bisa langsung dilipat</p>
+                        <p class="text-[11px] text-slate-600 font-medium mt-1">Paketan Cuci + Kering Hemat: Rp 30.000</p>
                     </div>
 
                     <ul class="space-y-3 text-xs text-slate-600">
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Suhu optimal membunuh tungau & bakteri</span>
+                            <span>Pengeringan cepat dan tuntas 100%</span>
                         </li>
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -108,7 +108,7 @@
                         </li>
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Meja lipat higienis & wangi pelembut gratis</span>
+                            <span>Tersedia Opsi Mesin Cuci Besar (Max 12kg) Cuci+Kering: Rp 50.000</span>
                         </li>
                     </ul>
                 </div>
@@ -136,30 +136,30 @@
                         <span class="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">Drop-Off Staf</span>
                     </div>
 
-                    <h3 class="text-xl font-bold text-slate-900">Drop-Off Kiloan & Satuan</h3>
-                    <p class="text-xs text-slate-500 mt-1 mb-5">Titipkan cucian, staf kami yang cuci, kering, & setrika.</p>
+                    <h3 class="text-xl font-bold text-slate-900">Non-Self Service / Titip</h3>
+                    <p class="text-xs text-slate-500 mt-1 mb-5">Layanan terima beres yang dikerjakan oleh staf kami.</p>
 
                     <div class="border-y border-slate-100 py-4 my-4">
                         <div class="flex items-baseline gap-1">
                             <span class="text-xs font-bold text-slate-500">Mulai</span>
-                            <span class="text-3xl font-extrabold text-slate-900">Rp 7.000</span>
-                            <span class="text-xs text-slate-500 font-semibold">/ kg (Reguler)</span>
+                            <span class="text-3xl font-extrabold text-slate-900">Rp 15.000</span>
+                            <span class="text-xs text-slate-500 font-semibold">/ Cuci Saja (Tanpa Sabun)</span>
                         </div>
-                        <p class="text-[11px] text-slate-600 font-medium mt-1">Express 4 Jam: Rp 12.000 / kg</p>
+                        <p class="text-[11px] text-slate-600 font-medium mt-1">Opsi Tambahan: Cuci Kering (+Sabun) Rp 45.000 | Cuci Lipat (+Sabun) Rp 50.000</p>
                     </div>
 
                     <ul class="space-y-3 text-xs text-slate-600">
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Cuci + Kering + Setrika uap rapi</span>
+                            <span>Dikerjakan penuh oleh staf berpengalaman</span>
                         </li>
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Packing plastik higienis bersegel</span>
+                            <span>Pilihan hitung jumlah pakaian atau tanpa hitung</span>
                         </li>
                         <li class="flex items-center gap-2.5">
                             <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Tersedia layanan Bedcover & Selimut</span>
+                            <span>Komplain berlaku 1x24 jam setelah pengambilan</span>
                         </li>
                     </ul>
                 </div>
@@ -185,34 +185,34 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                 <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
                     <div>
-                        <p class="font-bold text-slate-800">Bedcover Kecil</p>
-                        <p class="text-slate-500 text-[11px]">Single size / anak</p>
-                    </div>
-                    <span class="font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md">Rp 20.000</span>
-                </div>
-
-                <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
-                    <div>
-                        <p class="font-bold text-slate-800">Bedcover Besar</p>
-                        <p class="text-slate-500 text-[11px]">King / Queen size</p>
+                        <p class="font-bold text-slate-800">Paket Cuci + Kering (Self Service)</p>
+                        <p class="text-slate-500 text-[11px]">Kombinasi mesin cuci & pengering</p>
                     </div>
                     <span class="font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md">Rp 30.000</span>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
                     <div>
-                        <p class="font-bold text-slate-800">Sepatu / Sneakers</p>
-                        <p class="text-slate-500 text-[11px]">Deep clean + deodorizer</p>
+                        <p class="font-bold text-slate-800">Mesin Besar Max 12kg (Self Service)</p>
+                        <p class="text-slate-500 text-[11px]">Cuci + Kering muatan besar</p>
                     </div>
-                    <span class="font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md">Rp 25.000</span>
+                    <span class="font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md">Rp 50.000</span>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
                     <div>
-                        <p class="font-bold text-slate-800">Jas / Blazer</p>
-                        <p class="text-slate-500 text-[11px]">Dry clean + hanger</p>
+                        <p class="font-bold text-slate-800">Non-Self Service (Cuci Kering)</p>
+                        <p class="text-slate-500 text-[11px]">Layanan titip + sabun</p>
                     </div>
-                    <span class="font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md">Rp 25.000</span>
+                    <span class="font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md">Rp 45.000</span>
+                </div>
+
+                <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center">
+                    <div>
+                        <p class="font-bold text-slate-800">Non-Self Service (Cuci Lipat)</p>
+                        <p class="text-slate-500 text-[11px]">Layanan titip + sabun + lipat</p>
+                    </div>
+                    <span class="font-extrabold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md">Rp 50.000</span>
                 </div>
             </div>
         </div>
