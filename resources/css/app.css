@@ -1,33 +1,88 @@
 @import "tailwindcss";
 
 @theme {
-    --color-bg: #FFFFFF;
+    --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+
+    --color-bg: #F8FAFC;
     --color-surface: #FFFFFF;
-    --color-container: #F9FAFB;
+    --color-container: #F1F5F9;
+    --color-border: #E2E8F0;
 
-    --color-border: #E5E7EB;
+    --color-text: #0F172A;
+    --color-muted: #64748B;
 
-    --color-text: #1F2937;
-    --color-muted: #6B7280;
+    --color-primary-50: #F0F9FF;
+    --color-primary-100: #E0F2FE;
+    --color-primary-200: #BAE6FD;
+    --color-primary-300: #7DD3FC;
+    --color-primary-400: #38BDF8;
+    --color-primary-500: #0EA5E9;
+    --color-primary: #0284C7;
+    --color-primary-600: #0284C7;
+    --color-primary-hover: #0369A1;
+    --color-primary-700: #0369A1;
+    --color-primary-800: #075985;
+    --color-primary-900: #0C4A6E;
 
-    --color-primary: #E30613;
-    --color-primary-hover: #B7050F;
+    --color-coin-50: #FFFBEB;
+    --color-coin-100: #FEF3C7;
+    --color-coin-200: #FDE68A;
+    --color-coin-300: #FCD34D;
+    --color-coin-400: #FBBF24;
+    --color-coin: #F59E0B;
+    --color-coin-500: #F59E0B;
+    --color-coin-hover: #D97706;
+    --color-coin-600: #D97706;
+    --color-coin-700: #B45309;
 
-    --color-secondary: #FFE800;
+    --color-secondary: #F59E0B;
 
-    --color-success: #22C55E;
+    --color-success: #10B981;
     --color-danger: #EF4444;
     --color-warning: #F59E0B;
 }
 
-html { scroll-behavior: smooth; }
-* { scrollbar-width: thin; scrollbar-color: var(--color-primary) transparent; }
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-track { background: transparent; }
+html {
+    scroll-behavior: smooth;
+    font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #0284C7 #F1F5F9;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #F1F5F9;
+}
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 90%, white), var(--color-primary));
-    border-radius: 999px; border: 2px solid transparent; background-clip: content-box;
+    background: #0284C7;
+    border-radius: 999px;
 }
+
 ::selection {
-    background: color-mix(in srgb, var(--color-primary) 25%, transparent); color: var(--color-primary);
+    background: #BAE6FD;
+    color: #0C4A6E;
 }
+
+@keyframes drumSpinSlow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .animate-drum-spin {
+        animation: drumSpinSlow 16s linear infinite;
+    }
+}
+

@@ -1,13 +1,21 @@
-    import '../css/app.css';
-    import './bootstrap';
+import '../css/app.css';
+import './bootstrap';
 
-    import { createInertiaApp } from '@inertiajs/vue3';
-    import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-    import { createApp, h } from 'vue';
-    import { ZiggyVue } from '../../vendor/tightenco/ziggy';
+import Alpine from 'alpinejs';
+import collapse from '@alpinejs/collapse';
 
-    const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+Alpine.plugin(collapse);
+window.Alpine = Alpine;
+Alpine.start();
 
+import { createInertiaApp } from '@inertiajs/vue3';
+import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import { createApp, h } from 'vue';
+import { ZiggyVue } from '../../vendor/tightenco/ziggy';
+
+const appName = import.meta.env.VITE_APP_NAME || 'Laundry Coin';
+
+if (document.getElementById('app') && document.getElementById('app').dataset.page) {
     createInertiaApp({
         title: (title) => `${title} ${appName}`,
         resolve: (name) =>
@@ -22,6 +30,8 @@
                 .mount(el);
         },
         progress: {
-            color: '#4B5563',
+            color: '#0284C7',
         },
     });
+}
+
