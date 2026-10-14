@@ -70,7 +70,7 @@
     <!-- Modal Box -->
     <div
         x-show="show"
-        class="mb-6 bg-white rounded-2xl overflow-hidden shadow-2xl transform transition-all sm:w-full {{ $maxWidthClass }} border border-slate-200 z-10"
+        class="relative mb-6 bg-white rounded-2xl overflow-hidden shadow-2xl transform transition-all sm:w-full {{ $maxWidthClass }} border border-slate-200 z-10"
         x-transition:enter="ease-out duration-300"
         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"

@@ -18,8 +18,14 @@ class OrderProcess extends Model
         return $this->belongsTo(Order::class);
     }
 
-    public function operator()
+    public function pegawai()
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    // Alias untuk kompatibilitas jika dipanggil
+    public function operator()
+    {
+        return $this->pegawai();
     }
 }

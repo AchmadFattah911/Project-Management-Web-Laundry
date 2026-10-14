@@ -12,7 +12,7 @@
                 </h2>
 
                 <p class="text-base text-slate-600 leading-relaxed">
-                    Kami hadir di lokasi yang strategis dan mudah diakses di pusat kota Samarinda. Parkir luas untuk roda dua dan empat memudahkan Anda membawa cucian banyak tanpa cemas.
+                    Hadir di lokasi strategis wilayah {{ config('laundry.city', '[ISI KOTA OUTLET]') }} dengan fasilitas parkir luas dan akses mudah untuk membawa cucian Anda setiap hari.
                 </p>
 
                 <!-- Schedule Box -->
@@ -24,11 +24,11 @@
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-slate-800">Senin s/d Minggu (Setiap Hari)</p>
-                                <p class="text-[11px] text-slate-500">Termasuk Hari Libur Nasional & Tanggal Merah</p>
+                                <p class="text-[11px] text-slate-500">{{ config('laundry.operating_hours.notes', 'Termasuk Hari Libur Nasional') }}</p>
                             </div>
                         </div>
                         <span class="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-xs">
-                            07:00 - 22:00 WITA
+                            {{ config('laundry.operating_hours.weekday', '07:00 - 22:00') }} {{ config('laundry.operating_hours.timezone', 'WIB') }}
                         </span>
                     </div>
 
@@ -36,7 +36,7 @@
                         <svg class="w-4 h-4 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                         </svg>
-                        <span>Last order mesin cuci self-service pukul <strong>21:00 WITA</strong> agar proses cuci-kering tuntas sebelum tutup.</span>
+                        <span>Last order mesin cuci self-service pukul <strong>{{ config('laundry.operating_hours.last_order', '21:00') }} {{ config('laundry.operating_hours.timezone', 'WIB') }}</strong> agar proses cuci-kering tuntas sebelum outlet tutup.</span>
                     </div>
                 </div>
 
@@ -54,7 +54,7 @@
                         </div>
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-sky-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            <span>Dispenser Koin & QRIS All-Bank</span>
+                            <span>Pembayaran Cashless (Transfer & QRIS)</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <svg class="w-4 h-4 text-sky-600 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -70,10 +70,10 @@
                     <div class="flex items-center justify-between pb-6 border-b border-slate-800">
                         <div>
                             <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Pusat Outlet</span>
-                            <h3 class="text-xl font-bold text-white mt-1">Laundry Coin Samarinda</h3>
+                            <h3 class="text-xl font-bold text-white mt-1">{{ config('laundry.store_name', 'Laundry Coin') }}</h3>
                         </div>
                         <span class="px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-400 text-xs font-semibold border border-emerald-500/30">
-                            Buka Sekarang
+                            Buka Setiap Hari
                         </span>
                     </div>
 
@@ -84,7 +84,7 @@
                             </div>
                             <div>
                                 <p class="font-semibold text-white">Alamat Outlet</p>
-                                <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">Jl. Pangeran Suryanata No. 45, Air Putih, Kec. Samarinda Ulu, Kota Samarinda, Kalimantan Timur 75124</p>
+                                <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">{{ config('laundry.address', '[ISI ALAMAT TOKO LENGKAP]') }}</p>
                             </div>
                         </div>
 
@@ -93,24 +93,26 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </div>
                             <div>
-                                <p class="font-semibold text-white">Layanan Antar-Jemput (Pickup & Delivery)</p>
-                                <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">Melayani penjemputan cucian area Samarinda Kota, Samarinda Ulu, Sungai Pinang, dan sekitarnya.</p>
+                                <p class="font-semibold text-white">Wilayah Layanan</p>
+                                <p class="text-xs text-slate-400 mt-0.5 leading-relaxed">{{ config('laundry.service_area', '[ISI NAMA AREA / WILAYAH OUTLET]') }}</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="pt-4 border-t border-slate-800 flex flex-wrap gap-3">
                         <a
-                            href="https://maps.google.com"
+                            href="{{ config('laundry.google_maps_url', 'https://maps.google.com') }}"
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs transition-colors"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
                             <span>Buka di Google Maps</span>
                         </a>
                         <a
-                            href="https://wa.me/6281234567890?text=Halo%20Laundry%20Coin,%20saya%20mau%20tanya%20layanan%20laundromat"
+                            href="https://wa.me/{{ preg_replace('/[^0-9]/', '', config('laundry.whatsapp', '')) }}?text=Halo%20{{ urlencode(config('laundry.store_name', 'Laundry Coin')) }},%20saya%20mau%20tanya%20layanan"
                             target="_blank"
+                            rel="noopener noreferrer"
                             class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-200 font-bold text-xs transition-colors"
                         >
                             <span>Hubungi Staf Outlet</span>

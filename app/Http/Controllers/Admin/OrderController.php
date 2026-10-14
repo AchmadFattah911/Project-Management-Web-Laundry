@@ -3,155 +3,127 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
-use App\Models\Payment;
 use App\Models\Service;
 use App\Models\User;
-use Carbon\Carbon;
+use App\Services\OrderService;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
 
 class OrderController extends Controller
 {
+    use AuthorizesRequests;
+
+    public function __construct(
+        protected OrderService $orderService
+    ) {}
+
     public function index(Request $request)
     {
         $search = $request->input('search', '');
         $status = $request->input('status', '');
+        $paymentStatus = $request->input('payment_status', '');
+        $date = $request->input('date', '');
 
-        $query = Order::with(['user', 'service', 'payments'])
-            ->when($search, fn($q) => $q->where(fn($q2) =>
-                $q2->whereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"))
-                   ->orWhereHas('service', fn($s) => $s->where('name', 'like', "%{$search}%"))
-                   ->orWhere('id', 'like', "%{$search}%")
-            ))
+        $query = Order::with(['user', 'service', 'payments', 'checkout.payments', 'orderProcesses'])
+            ->when($search, fn($q) => $q->where(function ($q2) use ($search) {
+                $q2->where('order_code', 'like', "%{$search}%")
+                   ->orWhere('customer_name', 'like', "%{$search}%")
+                   ->orWhere('customer_phone', 'like', "%{$search}%")
+                   ->orWhereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"))
+                   ->orWhereHas('service', fn($s) => $s->where('name', 'like', "%{$search}%"));
+            }))
             ->when($status, fn($q) => $q->where('status', $status))
+            // Belum lunas = tidak punya pembayaran paid (termasuk gagal/kadaluarsa), juga lewat checkout
+            ->paymentStatus($paymentStatus)
+            ->when($date, fn($q) => $q->whereDate('created_at', $date))
             ->latest();
 
-        $orders = $query->paginate(10)->withQueryString()->through(fn($o) => [
-            'id'             => $o->id,
-            'invoice'        => 'ORD-' . str_pad($o->id, 4, '0', STR_PAD_LEFT),
-            'customer'       => $o->user?->name ?? '-',
-            'customer_email' => $o->user?->email ?? '-',
-            'service'        => $o->service?->name ?? '-',
-            'service_id'     => $o->service_id,
-            'weight'         => $o->weight,
-            'status'         => $o->status,
-            'total_price'    => $o->total_price,
-            'pickup_address' => $o->pickup_address,
-            'delivery_address' => $o->delivery_address,
-            'payment_status' => $o->payments->first()?->status ?? 'belum',
-            'payment_method' => $o->payments->first()?->method ?? '-',
-            'date'           => $o->created_at->format('d M Y'),
-        ]);
+        $orders = $query->paginate(10)->withQueryString();
 
-        // ── Stats ──────────────────────────────────────────
         $stats = [
             'total'    => Order::count(),
-            'selesai'  => Order::where('status', 'selesai')->count(),
-            'diproses' => Order::where('status', 'diproses')->count(),
             'pending'  => Order::where('status', 'pending')->count(),
+            'diproses' => Order::where('status', 'diproses')->count(),
+            'siap_diambil' => Order::where('status', Order::STATUS_SIAP_DIAMBIL)->count(),
+            'selesai'  => Order::where('status', Order::STATUS_SELESAI)->count(),
         ];
 
-        // ── Chart 1: Status Distribution (Doughnut) ────────
-        $statusDist = [
-            Order::where('status', 'selesai')->count(),
-            Order::where('status', 'diproses')->count(),
-            Order::where('status', 'pending')->count(),
-            Order::where('status', 'diantar')->count(),
-        ];
+        // Services aktif untuk form pemesanan
+        $services = Service::aktif()->get();
+        $customers = User::where('role', 'pelanggan')->select('id', 'name', 'phone')->get();
 
-        // ── Chart 2: Weekly Trend (Line) ──────────────────
-        $weeklyTrend = collect(range(6, 0))->map(function ($i) {
-            $day = Carbon::now()->subDays($i);
-            return [
-                'label' => $day->format('D'),
-                'value' => Order::whereDate('created_at', $day->toDateString())->count(),
-            ];
-        });
-
-        // ── Chart 3: Payment Method (Doughnut) ────────────
-        $paymentMethods = [
-            Payment::where('method', 'transfer')->count(),
-            Payment::where('method', 'cash')->count(),
-            Payment::where('method', 'e-wallet')->count(),
-        ];
-
-        // ── Chart 4: Top services (Bar) 4 months ──────────
-        $services = Service::orderByDesc(
-            Order::selectRaw('COUNT(*)')
-                ->whereColumn('service_id', 'services.id')
-        )->limit(3)->get();
-
-        $topServicesChart = collect(range(3, 0))->map(function ($i) use ($services) {
-            $month = Carbon::now()->subMonths($i);
-            $row = ['label' => $month->format('M')];
-            foreach ($services as $s) {
-                $row[$s->name] = Order::where('service_id', $s->id)
-                    ->whereYear('created_at', $month->year)
-                    ->whereMonth('created_at', $month->month)
-                    ->count();
-            }
-            return $row;
-        });
-
-        // Services list for form dropdown
-        $serviceList = Service::select('id', 'name', 'price')->get();
-        $customerList = User::where('role', 'pelanggan')->select('id', 'name', 'email')->get();
-
-        return Inertia::render('dashboard/admin/manajemen-order', [
-            'orders'      => $orders,
-            'stats'       => $stats,
-            'filters'     => ['search' => $search, 'status' => $status],
-            'services'    => $serviceList,
-            'customers'   => $customerList,
-            'chartData'   => [
-                'statusDist'     => $statusDist,
-                'weeklyTrend'    => $weeklyTrend,
-                'paymentMethods' => $paymentMethods,
-                'topServices'    => $topServicesChart,
-                'serviceNames'   => $services->pluck('name'),
-            ],
-        ]);
+        return view('admin.orders.index', compact('orders', 'stats', 'services', 'customers', 'search', 'status', 'paymentStatus', 'date'));
     }
 
-    public function store(Request $request)
+    public function store(StoreOrderRequest $request)
     {
-        $validated = $request->validate([
-            'user_id'          => 'required|exists:users,id',
-            'service_id'       => 'required|exists:services,id',
-            'weight'           => 'required|numeric|min:0.1',
-            'status'           => ['required', Rule::in(['pending', 'diproses', 'selesai', 'diantar'])],
-            'total_price'      => 'required|numeric|min:0',
-            'pickup_address'   => 'required|string',
-            'delivery_address' => 'required|string',
-        ]);
-
-        Order::create($validated);
-
-        return back()->with('success', 'Pesanan berhasil dibuat.');
+        try {
+            $this->orderService->create($request->validated());
+            return back()->with('success', 'Pesanan berhasil dibuat.');
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
     }
 
     public function update(Request $request, Order $order)
     {
         $validated = $request->validate([
-            'user_id'          => 'required|exists:users,id',
-            'service_id'       => 'required|exists:services,id',
-            'weight'           => 'required|numeric|min:0.1',
-            'status'           => ['required', Rule::in(['pending', 'diproses', 'selesai', 'diantar'])],
-            'total_price'      => 'required|numeric|min:0',
-            'pickup_address'   => 'required|string',
-            'delivery_address' => 'required|string',
+            'status'      => ['nullable', 'string', Rule::in(Order::STATUSES)],
+            'machine_qty' => 'nullable|integer|min:1|max:20',
         ]);
 
-        $order->update($validated);
+        try {
+            if (isset($validated['machine_qty']) && $validated['machine_qty'] != $order->machine_qty) {
+                $this->orderService->updateMachineQty($order, (int) $validated['machine_qty'], auth()->user());
+            }
 
-        return back()->with('success', 'Pesanan berhasil diperbarui.');
+            if (isset($validated['status']) && $validated['status'] != $order->status) {
+                $this->orderService->updateStatus($order, $validated['status'], auth()->user());
+            }
+
+            return back()->with('success', 'Pesanan berhasil diperbarui.');
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 
     public function destroy(Order $order)
     {
+        $this->authorize('delete', $order);
+
         $order->delete();
         return back()->with('success', 'Pesanan berhasil dihapus.');
+    }
+
+    public function confirmPayment(Request $request, Order $order)
+    {
+        $validated = $request->validate([
+            'method' => 'required|in:cash,transfer,e-wallet',
+        ]);
+
+        if ($order->isPaid()) {
+            return back()->with('error', 'Pesanan ini sudah lunas sebelumnya.');
+        }
+
+        app(\App\Services\PaymentService::class)->confirmManually($order, $validated['method'], $request->user());
+
+        return back()->with('success', 'Pembayaran pesanan berhasil dikonfirmasi lunas.');
+    }
+
+    public function updateProcess(Request $request, \App\Models\OrderProcess $process)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:pending,selesai',
+        ]);
+
+        try {
+            $this->orderService->updateProcess($process, $validated['status'], auth()->user());
+            return back()->with('success', "Proses {$process->process} berhasil diperbarui.");
+        } catch (\Exception $e) {
+            return back()->with('error', $e->getMessage());
+        }
     }
 }

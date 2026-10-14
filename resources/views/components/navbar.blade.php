@@ -1,3 +1,8 @@
+@php
+    // Badge keranjang khusus pelanggan (1 query ringan, hanya untuk pelanggan login)
+    $cartCount = auth()->user()?->isPelanggan() ? auth()->user()->cartItems()->count() : 0;
+@endphp
+
 <nav
     x-data="{ mobileOpen: false, scrolled: false }"
     x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 20 })"
@@ -61,15 +66,36 @@
             <!-- Desktop Auth Action Buttons -->
             <div class="hidden md:flex items-center gap-2.5">
                 @auth
-                    <a
-                        href="{{ route('dashboard') }}"
-                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                        <span>Dashboard</span>
-                    </a>
+                    @if (auth()->user()->isPelanggan())
+                        <a
+                            href="{{ route('pelanggan.pesan.index') }}"
+                            class="relative inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all"
+                        >
+                            <x-icon name="cart" class="w-4 h-4" />
+                            <span>Pesan</span>
+                            @if ($cartCount > 0)
+                                <span class="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-extrabold leading-5 text-center" aria-label="{{ $cartCount }} layanan di keranjang">{{ $cartCount }}</span>
+                            @endif
+                        </a>
+                        <a
+                            href="{{ route('pelanggan.akun') }}"
+                            class="flex items-center gap-2.5 pl-3 pr-1 py-1 rounded-full border border-slate-200 hover:border-sky-300 hover:bg-sky-50/60 transition-colors"
+                            aria-label="Akun Saya"
+                        >
+                            <span class="text-sm font-semibold text-slate-800 max-w-[10rem] truncate">{{ auth()->user()->name }}</span>
+                            <span class="w-8 h-8 rounded-full bg-sky-600 text-white flex items-center justify-center text-xs font-extrabold">{{ auth()->user()->initials() }}</span>
+                        </a>
+                    @else
+                        <a
+                            href="{{ route('dashboard') }}"
+                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            <span>Dashboard</span>
+                        </a>
+                    @endif
                 @else
                     <a
                         href="{{ route('login') }}"
@@ -133,11 +159,20 @@
 
         <div class="pt-4 border-t border-slate-100 flex flex-col gap-2">
             @auth
+                @if (auth()->user()->isPelanggan())
+                    <a
+                        href="{{ route('pelanggan.pesan.index') }}"
+                        class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg"
+                    >
+                        <x-icon name="cart" class="w-4 h-4" />
+                        Pesan Layanan{{ $cartCount > 0 ? " ({$cartCount} di keranjang)" : '' }}
+                    </a>
+                @endif
                 <a
-                    href="{{ route('dashboard') }}"
+                    href="{{ auth()->user()->isPelanggan() ? route('pelanggan.akun') : route('dashboard') }}"
                     class="w-full text-center px-4 py-2.5 text-sm font-semibold text-white bg-sky-600 rounded-lg"
                 >
-                    Dashboard Saya
+                    {{ auth()->user()->isPelanggan() ? 'Akun Saya' : 'Dashboard Saya' }}
                 </a>
             @else
                 <a

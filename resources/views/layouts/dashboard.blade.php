@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title }} - Laundry Coin</title>
+    <title>@yield('title', $title ?? 'Dashboard') - {{ config('app.name', 'Laundry Coin') }}</title>
 
     <!-- Fonts: Plus Jakarta Sans & DM Sans via Bunny Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -22,6 +22,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('styles')
 </head>
 <body
     x-data="{ sidebarOpen: false }"
@@ -64,5 +65,6 @@
             </footer>
         </div>
     </div>
+    @stack('scripts')
 </body>
 </html>

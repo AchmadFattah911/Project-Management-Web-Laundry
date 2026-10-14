@@ -25,15 +25,16 @@
                         </div>
                         <div>
                             <h3 class="font-bold text-base leading-tight">Fast Response WhatsApp</h3>
-                            <p class="text-xs text-emerald-100">Aktif jam operasional 07:00 - 22:00 WITA</p>
+                            <p class="text-xs text-emerald-100">Aktif jam operasional {{ config('laundry.operating_hours.weekday', '07:00 - 22:00') }} {{ config('laundry.operating_hours.timezone', 'WIB') }}</p>
                         </div>
                     </div>
                     <p class="text-xs text-emerald-50 leading-relaxed mb-4">
-                        Kirim pesan instan untuk konsultasi kapasitas cucian atau pemesanan pickup ke rumah Anda.
+                        Kirim pesan instan untuk konsultasi kapasitas cucian, ketersediaan mesin cuci mandiri, atau pertanyaan seputar layanan kami.
                     </p>
                     <a
-                        href="https://wa.me/6281234567890?text=Halo%20Laundry%20Coin,%20saya%20ingin%20tanya%20layanan%20laundry"
+                        href="https://wa.me/{{ preg_replace('/[^0-9]/', '', config('laundry.whatsapp', '')) }}?text=Halo%20{{ urlencode(config('laundry.store_name', 'Laundry Coin')) }},%20saya%20ingin%20tanya%20layanan"
                         target="_blank"
+                        rel="noopener noreferrer"
                         class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 font-bold text-xs shadow-xs transition-colors"
                     >
                         <span>Chat WhatsApp Sekarang</span>
@@ -87,9 +88,8 @@
                                 id="contact-service"
                                 class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
                             >
-                                <option value="koin">Self-Service Cuci & Kering Koin</option>
+                                <option value="self-laundry">Self Laundry (Cuci & Kering Mandiri di Outlet)</option>
                                 <option value="dropoff">Drop-Off Kiloan / Express</option>
-                                <option value="pickup">Pemesanan Antar-Jemput (Pickup)</option>
                                 <option value="satuan">Cuci Bedcover / Sepatu / Satuan</option>
                                 <option value="lainnya">Pertanyaan Lainnya</option>
                             </select>

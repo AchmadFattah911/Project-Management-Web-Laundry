@@ -10,7 +10,7 @@
                 <!-- Pill Badge -->
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-sky-100/80 border border-sky-200 text-sky-800 text-xs font-semibold">
                     <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                    <span>Laundromat Koin Modern #1 di Samarinda</span>
+                    <span>Laundromat Modern di {{ config('laundry.city', '[ISI KOTA OUTLET]') }}</span>
                 </div>
 
                 <!-- Headline -->
@@ -20,7 +20,7 @@
 
                 <!-- Subheadline -->
                 <p class="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl">
-                    <strong>Laundry Coin</strong> menghadirkan pengalaman cuci koin mandiri praktis dengan mesin komersial berkapasitas besar. Tanpa ribet jemur, higienis dengan air filter steril, dan siap pakai seketika.
+                    <strong>Laundry Coin</strong> menghadirkan self laundry praktis dengan mesin komersial berkapasitas besar, serta layanan drop-off yang bisa dipesan online. Tanpa ribet jemur, higienis dengan air filter steril, dan siap pakai seketika.
                 </p>
 
                 <!-- Action CTAs -->
@@ -39,11 +39,8 @@
                         href="#cara-kerja"
                         class="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm shadow-xs transition-all"
                     >
-                        <!-- Coin Icon -->
-                        <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 5h2v2H9V5zm0 4h2v6H9V9z" />
-                        </svg>
-                        <span>Pelajari Cara Kerja Koin</span>
+                        <x-icon name="info" class="w-4 h-4 text-amber-500" />
+                        <span>Pelajari Cara Kerja</span>
                     </a>
                 </div>
 
@@ -76,7 +73,7 @@
                                 <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Mesin #04 Siap Pakai</span>
                             </div>
                             <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
-                                1 Koin = 1 Siklus
+                                Bayar Cashless
                             </span>
                         </div>
 
@@ -125,14 +122,14 @@
                                 <rect x="35" y="70" width="30" height="8" rx="2" fill="#CBD5E1" />
                             </svg>
 
-                            <!-- Coin Floating Badge Beside Washer -->
+                            <!-- Floating Badge Pembayaran Cashless -->
                             <div class="absolute -bottom-3 -right-2 bg-white rounded-2xl p-3 border border-slate-200 shadow-lg flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center font-black text-sm shadow-xs border-2 border-amber-300">
-                                    🪙
+                                    <x-icon name="check" class="w-5 h-5" />
                                 </div>
                                 <div class="text-left">
-                                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Token Koin</p>
-                                    <p class="text-xs font-extrabold text-slate-900">Rp 10.000 / Koin</p>
+                                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pembayaran Online</p>
+                                    <p class="text-xs font-extrabold text-slate-900">Transfer Bank & E-Wallet / QRIS</p>
                                 </div>
                             </div>
                         </div>

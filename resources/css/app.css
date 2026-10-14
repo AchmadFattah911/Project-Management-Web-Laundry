@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/forms";
+@source "../views";
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
 
 @theme {
     --font-display: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
@@ -86,3 +89,8 @@ h1, h2, h3, h4, h5, h6 {
     }
 }
 
+
+/* Sembunyikan elemen Alpine sebelum Alpine selesai inisialisasi */
+[x-cloak] {
+    display: none !important;
+}

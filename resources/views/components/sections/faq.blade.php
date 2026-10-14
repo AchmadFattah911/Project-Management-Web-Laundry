@@ -1,8 +1,8 @@
 @php
     $faqs = [
         [
-            'q' => 'Bagaimana cara membeli token koin di Laundry Coin?',
-            'a' => 'Anda dapat menukarkan uang tunai (pecahan Rp 10.000, Rp 20.000, dst) langsung di mesin penukar koin otomatis kami. Bagi Anda yang tidak membawa uang tunai, kasir kami menyediakan pembayaran non-tunai melalui QRIS (GoPay, OVO, ShopeePay, BCA, Mandiri, dll).'
+            'q' => 'Bagaimana cara membayar pesanan di Laundry Coin?',
+            'a' => 'Laundry Coin tidak menggunakan koin atau token. Untuk pesanan online, pembayaran dilakukan secara cashless melalui Transfer Bank atau E-Wallet / QRIS. Pilih metode saat membuat pesanan, bayar sesuai total tagihan, lalu petugas akan memverifikasi dan status pesanan Anda berubah menjadi Lunas. Untuk Self Laundry langsung di outlet, pembayaran dilakukan di kasir.'
         ],
         [
             'q' => 'Apakah deterjen dan pelembut pakaian disediakan gratis?',
@@ -17,12 +17,12 @@
             'a' => 'Boleh sekali! Pintu mesin cuci terkunci otomatis demi keamanan selama siklus berjalan. Anda bisa menunggu di waiting lounge ber-AC kami atau bepergian ke toko sekitar. Namun mohon kembali tepat waktu saat timer selesai agar tidak menghambat pengguna lain.'
         ],
         [
-            'q' => 'Apa perbedaan antara layanan Self-Service Koin dan Drop-Off?',
-            'a' => 'Layanan Self-Service Koin adalah layanan cuci mandiri di mana Anda sendiri yang memasukkan pakaian dan memindahkan ke pengering dengan harga hemat per siklus. Sedangkan layanan Drop-Off adalah layanan terima beres, di mana staf kami yang mencuci, mengeringkan, menyetrika uap, dan melipat rapi.'
+            'q' => 'Apa perbedaan antara layanan Self Laundry dan Drop-Off?',
+            'a' => 'Self Laundry adalah layanan cuci mandiri langsung di outlet (tidak bisa dipesan online) di mana Anda sendiri yang memasukkan pakaian dan memindahkan ke pengering dengan harga hemat per siklus. Sedangkan layanan Drop-Off adalah layanan terima beres, di mana staf kami yang mencuci, mengeringkan, dan melipat rapi sesuai paket yang dipilih. Layanan Drop-Off bisa dipesan online.'
         ],
         [
             'q' => 'Apakah Laundry Coin menyediakan layanan Antar-Jemput (Pickup & Delivery)?',
-            'a' => 'Tentu saja! Kami melayani antar-jemput untuk layanan Drop-Off Kiloan dan Satuan di area kota Samarinda. Anda dapat memesan melalui WhatsApp resmi kami atau login ke sistem Laundry Coin untuk memantau status pesanan.'
+            'a' => 'Saat ini Laundry Coin belum menyediakan layanan antar-jemput. Anda dapat memesan layanan Drop-Off secara online, lalu membawa dan mengambil pakaian langsung di outlet. Status pesanan bisa dipantau melalui akun Anda atau menu Lacak Pesanan.'
         ],
     ];
 @endphp
@@ -37,7 +37,7 @@
                 Ada Pertanyaan Seputar Laundry Coin?
             </h2>
             <p class="text-base text-slate-600 mt-3 leading-relaxed">
-                Temukan jawaban cepat mengenai mekanisme koin, durasi mesin, fasilitas, dan layanan antar-jemput.
+                Temukan jawaban cepat mengenai pembayaran, durasi mesin, fasilitas, dan cara pemesanan.
             </p>
         </div>
 

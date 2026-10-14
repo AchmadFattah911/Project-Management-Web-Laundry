@@ -1,30 +1,26 @@
 @php
-    $user = auth()->user() ?? (object)['name' => 'Admin User', 'role' => 'admin'];
-    $role = strtolower($user->role ?? 'admin');
+    $user = auth()->user() ?? (object)['name' => 'Pengguna', 'role' => 'admin', 'email' => ''];
+    $role = $user->role instanceof \App\Enums\UserRole ? $user->role->value : strtolower($user->role ?? 'admin');
 
     $adminLinks = [
-        ['name' => 'Overview', 'route' => 'admin.dashboard', 'icon' => 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z'],
-        ['name' => 'Manajemen User', 'route' => 'admin.users', 'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'],
-        ['name' => 'Manajemen Order', 'route' => 'admin.orders', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
-        ['name' => 'Layanan Laundry', 'route' => 'admin.services', 'icon' => 'M3 7h18M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4a3 3 0 016 0v3'],
-        ['name' => 'Pickup & Delivery', 'route' => 'admin.pickup', 'icon' => 'M3 13h13v-2H3v2zm0 4h9v-2H3v2zm0-8h18V7H3v2zm13 8a2 2 0 100-4 2 2 0 000 4zm4 0a2 2 0 100-4 2 2 0 000 4z'],
+        ['name' => 'Ringkasan Dashboard', 'route' => 'admin.dashboard', 'icon' => 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z'],
+        ['name' => 'Manajemen User', 'route' => 'admin.users.index', 'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z'],
+        ['name' => 'Manajemen Order', 'route' => 'admin.orders.index', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
+        ['name' => 'Layanan Laundry', 'route' => 'admin.services.index', 'icon' => 'M3 7h18M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4a3 3 0 016 0v3'],
     ];
 
-    $operatorLinks = [
-        ['name' => 'Antrian Cuci', 'route' => 'operator.dashboard', 'icon' => 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z'],
-    ];
-
-    $kurirLinks = [
-        ['name' => 'Tugas Pengiriman', 'route' => 'kurir.dashboard', 'icon' => 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
+    $pegawaiLinks = [
+        ['name' => 'Antrean Pengerjaan', 'route' => 'pegawai.dashboard', 'icon' => 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z'],
+        ['name' => 'Semua Pesanan', 'route' => 'pegawai.orders.index', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
     ];
 
     $pelangganLinks = [
-        ['name' => 'Dashboard Saya', 'route' => 'pelanggan.dashboard', 'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
+        ['name' => 'Akun Saya', 'route' => 'pelanggan.akun', 'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
+        ['name' => 'Riwayat Cucian', 'route' => 'pelanggan.orders.index', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
     ];
 
     $links = match ($role) {
-        'operator' => $operatorLinks,
-        'kurir' => $kurirLinks,
+        'pegawai' => $pegawaiLinks,
         'pelanggan' => $pelangganLinks,
         default => $adminLinks,
     };
@@ -64,15 +60,7 @@
     <!-- Sidebar Header / Brand Logo -->
     <div class="px-6 py-6 border-b border-slate-800 flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shadow-xs shrink-0">
-            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <rect x="3" y="2" width="18" height="20" rx="3" stroke-width="2" />
-                <line x1="3" y1="7" x2="21" y2="7" stroke-width="1.5" />
-                <circle cx="7" cy="4.5" r="1" fill="currentColor" />
-                <circle cx="10" cy="4.5" r="1" fill="currentColor" />
-                <rect x="14" y="3.8" width="4" height="1.4" rx="0.5" fill="#F59E0B" stroke="#D97706" stroke-width="0.5" />
-                <circle cx="12" cy="14" r="5" stroke-width="2" />
-                <path d="M10 14c.5-1 1.5-1 2 0s1.5 1 2 0" stroke-width="1.5" stroke-linecap="round" />
-            </svg>
+            <x-icon name="washer" class="w-6 h-6" />
         </div>
         <div class="flex flex-col overflow-hidden">
             <a href="{{ route('home') }}" class="font-extrabold text-lg tracking-tight text-white leading-none hover:text-sky-400 transition-colors">
@@ -81,7 +69,7 @@
             <div class="flex items-center gap-1.5 mt-1.5">
                 <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
-                    {{ $role }} panel
+                    Panel {{ $role }}
                 </span>
             </div>
         </div>
@@ -138,11 +126,9 @@
             @csrf
             <button
                 type="submit"
-                class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-red-600/80 rounded-lg transition-colors"
+                class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-red-600/80 rounded-lg transition-colors cursor-pointer"
             >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+                <x-icon name="logout" class="w-4 h-4" />
                 <span>Keluar (Logout)</span>
             </button>
         </form>

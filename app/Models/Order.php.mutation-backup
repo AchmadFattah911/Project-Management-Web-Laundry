@@ -1,0 +1,97 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+
+class Order extends Model
+{
+    protected $fillable = [
+        'order_code',
+        'user_id',
+        'service_id',
+        'customer_name',
+        'customer_phone',
+        'machine_qty',
+        'unit_price',
+        'total_price',
+        'item_type',
+        'notes',
+        'status',
+    ];
+
+    /**
+     * Pengelompokan status untuk tab riwayat pelanggan.
+     * Di proses = belum selesai dikerjakan, Selesai = sudah selesai / sudah diambil.
+     */
+    public const STATUS_GROUPS = [
+        'diproses' => ['pending', 'diproses'],
+        'selesai'  => ['selesai', 'diambil'],
+    ];
+
+    protected $casts = [
+        'machine_qty' => 'integer',
+        'unit_price' => 'decimal:2',
+        'total_price' => 'decimal:2',
+    ];
+
+    /**
+     * Filter berdasarkan grup tab ('semua' / grup tidak dikenal = tanpa filter).
+     * Dipanggil via Order::statusGroup('diproses')
+     */
+    public function scopeStatusGroup(Builder $query, ?string $group): Builder
+    {
+        $statuses = self::STATUS_GROUPS[$group] ?? null;
+
+        return $statuses ? $query->whereIn('status', $statuses) : $query;
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
+    }
+
+    public function orderProcesses()
+    {
+        return $this->hasMany(OrderProcess::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Percobaan pembayaran terbaru. Satu order bisa punya beberapa percobaan
+     * (misal gagal/kadaluarsa lalu dibuat ulang), jadi yang ditampilkan selalu yang terakhir.
+     */
+    public function latestPayment()
+    {
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
+    public function isPaid(): bool
+    {
+        if ($this->relationLoaded('payments')) {
+            return $this->payments->contains('status', Payment::STATUS_PAID);
+        }
+
+        return $this->payments()->where('status', Payment::STATUS_PAID)->exists();
+    }
+
+    /**
+     * Pembayaran yang ditampilkan di UI: yang lunas jika ada, selain itu percobaan terbaru.
+     * Memakai relasi payments yang sudah di-eager load agar tidak menambah query per baris.
+     */
+    public function paymentForDisplay(): ?Payment
+    {
+        return $this->payments->firstWhere('status', Payment::STATUS_PAID)
+            ?? $this->payments->sortByDesc('id')->first();
+    }
+}
