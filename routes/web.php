@@ -138,6 +138,7 @@ Route::middleware(['auth', 'verified', 'role:pelanggan'])
     ->name('pelanggan.')
     ->group(function () {
         Route::get('/', [PelangganCartController::class, 'index'])->name('pesan.index');
+        Route::get('/keranjang', [PelangganCartController::class, 'cart'])->name('cart.index');
         Route::post('/keranjang', [PelangganCartController::class, 'store'])->middleware('throttle:30,1')->name('cart.store');
         Route::patch('/keranjang/{item}', [PelangganCartController::class, 'update'])->whereNumber('item')->name('cart.update');
         Route::delete('/keranjang/{item}', [PelangganCartController::class, 'destroy'])->whereNumber('item')->name('cart.destroy');

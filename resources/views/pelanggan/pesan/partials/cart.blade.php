@@ -22,7 +22,10 @@
                 <x-icon name="cart" class="w-6 h-6" />
             </div>
             <p class="text-sm font-bold text-slate-700">Keranjang masih kosong</p>
-            <p class="text-xs text-slate-500 mt-1">Centang layanan di sebelah kiri, lalu klik "Tambah ke Keranjang".</p>
+            <p class="text-xs text-slate-500 mt-1">Buka layanan di halaman Pesan, lalu klik ikon keranjang di kanan bawah layanan.</p>
+            <a href="{{ route('pelanggan.pesan.index') }}" class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-colors">
+                Pilih Layanan
+            </a>
         </div>
     @else
         <ul class="divide-y divide-slate-100">
@@ -92,7 +95,7 @@
             </div>
 
             @if ($readonly)
-                <a href="{{ route('pelanggan.pesan.index') }}" class="block text-center text-xs font-bold text-sky-700 hover:text-sky-800">
+                <a href="{{ route('pelanggan.cart.index') }}" class="block text-center text-xs font-bold text-sky-700 hover:text-sky-800">
                     Ubah isi keranjang
                 </a>
             @elseif ($cart['orderable']->isNotEmpty())

@@ -40,7 +40,7 @@
 
     <div class="px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100">
         <h2 class="text-base font-extrabold text-slate-900">1. Pilih Layanan Drop-Off</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Boleh centang lebih dari satu layanan. Semua yang dicentang masuk keranjang sekaligus.</p>
+        <p class="text-xs text-slate-500 mt-0.5">Centang layanan untuk membuka detailnya, lalu klik ikon keranjang di kanan bawah layanan untuk memasukkannya ke keranjang.</p>
     </div>
 
     @error('items')
@@ -101,7 +101,7 @@
                     <!-- Detail layanan (hanya terkirim jika dicentang: input disabled tidak ikut dikirim) -->
                     <div x-show="sel[{{ $id }}].checked" x-collapse @if (! $initial[$id]['checked']) x-cloak @endif>
                         <div class="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 mt-1">
-                            <input type="hidden" name="items[{{ $id }}][service_id]" value="{{ $id }}" :disabled="! sel[{{ $id }}].checked" />
+                            <input type="hidden" name="items[{{ $id }}][service_id]" value="{{ $id }}" :disabled="! included({{ $id }})" />
 
                             <!-- Jenis cucian -->
                             <div class="pt-3">
@@ -113,7 +113,7 @@
                                     id="srv-{{ $id }}-type"
                                     name="items[{{ $id }}][item_type]"
                                     x-model="sel[{{ $id }}].item_type"
-                                    :disabled="! sel[{{ $id }}].checked"
+                                    :disabled="! included({{ $id }})"
                                     class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
                                 >
                                     @foreach ($itemTypes as $key => $type)
@@ -138,7 +138,7 @@
                                         name="items[{{ $id }}][qty]"
                                         x-model.number="sel[{{ $id }}].qty"
                                         x-on:blur="clamp({{ $id }})"
-                                        :disabled="! sel[{{ $id }}].checked"
+                                        :disabled="! included({{ $id }})"
                                         min="1"
                                         max="{{ $maxQty }}"
                                         class="w-16 text-center rounded-lg border border-slate-300 py-1.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
@@ -193,7 +193,7 @@
                                     type="text"
                                     name="items[{{ $id }}][notes]"
                                     x-model="sel[{{ $id }}].notes"
-                                    :disabled="! sel[{{ $id }}].checked"
+                                    :disabled="! included({{ $id }})"
                                     maxlength="500"
                                     placeholder="Contoh: pisahkan pakaian putih"
                                     class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
@@ -203,35 +203,34 @@
                             @foreach ($cardErrors as $message)
                                 <p class="sm:col-span-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @endforeach
+
+                            <!-- Ikon keranjang: memasukkan HANYA layanan ini ke keranjang -->
+                            <div class="sm:col-span-2 flex items-center justify-end gap-3">
+                                <span class="text-[11px] font-semibold text-slate-500">Masukkan ke keranjang</span>
+                                <button
+                                    type="button"
+                                    x-on:click="addOne({{ $id }}, $el.form)"
+                                    :disabled="submitting"
+                                    class="relative w-11 h-11 rounded-full bg-sky-600 hover:bg-sky-700 text-white shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    aria-label="Masukkan {{ $service->name }} ke keranjang"
+                                    title="Masukkan ke keranjang"
+                                >
+                                    <span x-show="adding !== {{ $id }}"><x-icon name="cart" class="w-5 h-5" /></span>
+                                    <svg x-show="adding === {{ $id }}" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" class="opacity-25" /><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
+                                    <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center" aria-hidden="true">
+                                        <x-icon name="plus" class="w-3 h-3" />
+                                    </span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             @endforeach
         </div>
 
-        <!-- Ringkasan pilihan + tombol tambah (menempel di bawah layar pada mobile) -->
-        <div class="sticky bottom-0 lg:static z-20 rounded-b-2xl border-t border-slate-200 bg-white/95 backdrop-blur px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
-            <div class="text-xs">
-                <p class="font-bold text-slate-900">
-                    <span x-text="selected.length"></span> layanan · <span x-text="machineCount"></span> mesin
-                </p>
-                <p class="text-slate-500">Estimasi <span class="font-extrabold text-sky-700" x-text="rupiah(total)"></span></p>
-            </div>
-            <div class="flex items-center gap-2">
-                @if ($cart['items']->isNotEmpty())
-                    <a href="#keranjang" class="lg:hidden inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-slate-300 text-xs font-bold text-slate-700">
-                        <x-icon name="cart" class="w-4 h-4" /> {{ $cart['items']->count() }}
-                    </a>
-                @endif
-                <button
-                    type="submit"
-                    :disabled="selected.length === 0 || submitting"
-                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-bold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                    <x-icon name="cart" class="w-4 h-4" />
-                    <span x-text="submitting ? 'Menambahkan...' : 'Tambah ke Keranjang'">Tambah ke Keranjang</span>
-                </button>
-            </div>
+        <!-- Lanjut ke detail pemesanan (menempel di bawah layar pada mobile; di desktop ada di kolom kanan) -->
+        <div class="lg:hidden sticky bottom-0 z-20 rounded-b-2xl border-t border-slate-200 bg-white/95 backdrop-blur px-5 sm:px-6 py-4">
+            @include('pelanggan.pesan.partials.lanjut-detail', ['compact' => true])
         </div>
     @endif
 </form>
@@ -243,14 +242,10 @@
         Alpine.data('orderForm', (config) => ({
             ...config,
             submitting: false,
-            get selected() {
-                return this.services.filter((s) => this.sel[s.id]?.checked);
-            },
-            get machineCount() {
-                return this.selected.reduce((sum, s) => sum + (Number(this.sel[s.id].qty) || 0), 0);
-            },
-            get total() {
-                return this.selected.reduce((sum, s) => sum + s.price * (Number(this.sel[s.id].qty) || 0), 0);
+            adding: null,
+            // Hanya layanan yang ikon keranjangnya diklik yang inputnya aktif (input disabled tidak ikut dikirim)
+            included(id) {
+                return this.sel[id].checked && (this.adding === null || this.adding === id);
             },
             price(id) {
                 return this.services.find((s) => s.id === id)?.price ?? 0;
@@ -274,13 +269,17 @@
             rupiah(n) {
                 return 'Rp ' + Math.round(n).toLocaleString('id-ID');
             },
-            onSubmit(event) {
-                if (this.selected.length === 0 || this.submitting) {
-                    event.preventDefault();
-                    return;
-                }
-                this.selected.forEach((s) => this.clamp(s.id));
+            addOne(id, form) {
+                if (this.submitting || ! this.sel[id].checked) return;
+                this.clamp(id);
+                this.adding = id;
                 this.submitting = true;
+                // Tunggu atribut disabled diperbarui Alpine, baru kirim form
+                this.$nextTick(() => form.submit());
+            },
+            onSubmit(event) {
+                // Tekan Enter di dalam input tidak mengirim form; tambah ke keranjang lewat ikon tiap layanan
+                event.preventDefault();
             },
         }));
     });

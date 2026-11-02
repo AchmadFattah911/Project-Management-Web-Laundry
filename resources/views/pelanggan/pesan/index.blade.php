@@ -12,7 +12,7 @@
                 Kembali ke Beranda
             </a>
             <h1 class="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Pesan Layanan Laundry</h1>
-            <p class="text-sm text-slate-500 mt-1">Pilih satu atau beberapa layanan sekaligus, cek keranjang, lalu bayar online.</p>
+            <p class="text-sm text-slate-500 mt-1">Masukkan layanan ke keranjang lewat ikon keranjang, lanjut ke detail pemesanan, lalu bayar online.</p>
         </div>
 
         <!-- Stepper -->
@@ -31,9 +31,17 @@
             @endif
         </div>
 
-        <aside id="keranjang" class="lg:sticky lg:top-24 scroll-mt-24">
-            @include('pelanggan.pesan.partials.cart', ['readonly' => $step === 'detail'])
-        </aside>
+        @if ($step === 'detail')
+            {{-- Langkah detail: isi keranjang tampil sebagai ringkasan (hanya baca) untuk dikonfirmasi --}}
+            <aside id="keranjang" class="lg:sticky lg:top-24 scroll-mt-24">
+                @include('pelanggan.pesan.partials.cart', ['readonly' => true])
+            </aside>
+        @else
+            {{-- Langkah pilih: keranjang ada di halaman tersendiri (ikon keranjang di header) --}}
+            <aside class="hidden lg:block lg:sticky lg:top-24">
+                @include('pelanggan.pesan.partials.lanjut-detail')
+            </aside>
+        @endif
     </div>
 </div>
 @endsection

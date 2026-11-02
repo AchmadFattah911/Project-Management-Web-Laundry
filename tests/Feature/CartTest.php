@@ -164,7 +164,7 @@ class CartTest extends TestCase
         $this->actingAs($this->makeUser(UserRole::PEGAWAI))->post(route('pelanggan.cart.store'), ['items' => $items])->assertForbidden();
     }
 
-    public function test_halaman_pesan_menampilkan_isi_keranjang_dan_menyorot_item_baru(): void
+    public function test_halaman_keranjang_menampilkan_isi_keranjang_dan_menyorot_item_baru(): void
     {
         $a = $this->makeService(attributes: ['name' => 'Cuci Lipat Uji', 'price' => 50000]);
         $b = $this->makeService(attributes: ['name' => 'Cuci Saja Uji', 'price' => 15000]);
@@ -177,16 +177,65 @@ class CartTest extends TestCase
 
         $this->actingAs($this->pelanggan)
             ->withSession(['cart_highlight' => [$this->pelanggan->cartItems()->first()->id]])
-            ->get(route('pelanggan.pesan.index'))
+            ->get(route('pelanggan.cart.index'))
             ->assertOk()
+            ->assertSee('Keranjang Layanan')
             ->assertSeeInOrder(['Cuci Lipat Uji', 'Sprei / Selimut Tipis', 'Wangi lavender', 'Rp 100.000'])
             ->assertSee('BARU')
             ->assertSee('Layanan sedang tidak tersedia, tidak ikut dipesan.')
             ->assertSee('2 mesin')
             ->assertSee('Lanjut ke Detail Pesanan')
+            ->assertSee(route('pelanggan.cart.update', $this->pelanggan->cartItems()->first()->id), false);
+    }
+
+    public function test_halaman_pesan_mengganti_keranjang_dengan_tombol_lanjut_detail(): void
+    {
+        $a = $this->makeService(attributes: ['name' => 'Cuci Lipat Uji', 'price' => 50000]);
+        $this->addToCart([['service_id' => $a->id, 'qty' => 2, 'item_type' => 'pakaian']]);
+        $item = $this->pelanggan->cartItems()->first();
+
+        $this->actingAs($this->pelanggan)
+            ->get(route('pelanggan.pesan.index'))
+            ->assertOk()
+            ->assertSee('Lanjut ke Detail Pemesanan')
+            ->assertSee(route('pelanggan.pesan.index', ['langkah' => 'detail']), false)
+            ->assertSee('Masukkan Cuci Lipat Uji ke keranjang')
+            ->assertSee(route('pelanggan.cart.index'), false)
+            // Panel keranjang (ubah jumlah / hapus) sudah tidak ada di halaman ini
+            ->assertDontSee(route('pelanggan.cart.update', $item->id), false)
             // Perkiraan muatan hanya bantuan opsional: tidak pernah dikirim sebagai input form
             ->assertSee('Hitung dari perkiraan muatan (opsional)')
             ->assertDontSee('[weight]', false);
+    }
+
+    public function test_aksi_keranjang_dari_halaman_keranjang_kembali_ke_halaman_keranjang(): void
+    {
+        $a = $this->makeService();
+        $this->addToCart([['service_id' => $a->id, 'qty' => 2, 'item_type' => 'pakaian']]);
+        $item = $this->pelanggan->cartItems()->first();
+
+        $this->actingAs($this->pelanggan)->from(route('pelanggan.cart.index'))
+            ->patch(route('pelanggan.cart.update', $item->id), ['qty' => 3])
+            ->assertRedirect(route('pelanggan.cart.index'));
+        $this->assertSame(3, $item->fresh()->qty);
+
+        $this->actingAs($this->pelanggan)->from(route('pelanggan.cart.index'))
+            ->delete(route('pelanggan.cart.destroy', $item->id))
+            ->assertRedirect(route('pelanggan.cart.index'));
+        $this->assertSame(0, $this->pelanggan->cartItems()->count());
+    }
+
+    public function test_keranjang_tiap_pelanggan_terpisah_dan_hanya_untuk_pelanggan(): void
+    {
+        $a = $this->makeService(attributes: ['name' => 'Layanan Milik A']);
+        $this->addToCart([['service_id' => $a->id, 'qty' => 1, 'item_type' => 'pakaian']]);
+
+        $this->actingAs($this->makeUser(UserRole::PELANGGAN))->get(route('pelanggan.cart.index'))
+            ->assertOk()
+            ->assertDontSee('Layanan Milik A')
+            ->assertSee('Keranjang masih kosong');
+
+        $this->actingAs($this->makeUser(UserRole::PEGAWAI))->get(route('pelanggan.cart.index'))->assertForbidden();
     }
 
     public function test_ringkasan_memakai_harga_terbaru_dan_memisahkan_layanan_nonaktif(): void

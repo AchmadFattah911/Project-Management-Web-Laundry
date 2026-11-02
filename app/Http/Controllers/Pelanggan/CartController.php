@@ -53,6 +53,17 @@ class CartController extends Controller
         ]);
     }
 
+    /**
+     * Halaman keranjang tersendiri (ikon keranjang di header). Isi & aksinya sama dengan keranjang sebelumnya.
+     */
+    public function cart(Request $request)
+    {
+        return view('pelanggan.keranjang', [
+            'cart'   => $this->cartService->summary($request->user()),
+            'maxQty' => CartService::maxQty(),
+        ]);
+    }
+
     public function store(AddToCartRequest $request)
     {
         $added = $this->cartService->addMany($request->user(), $request->validated('items'));

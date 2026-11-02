@@ -69,12 +69,22 @@
                     @if (auth()->user()->isPelanggan())
                         <a
                             href="{{ route('pelanggan.pesan.index') }}"
-                            class="relative inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all"
+                            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-xs transition-all"
                         >
-                            <x-icon name="cart" class="w-4 h-4" />
+                            <x-icon name="plus" class="w-4 h-4" />
                             <span>Pesan</span>
+                        </a>
+                        <!-- Ikon keranjang: ke halaman keranjang layanan milik pelanggan ini -->
+                        <a
+                            href="{{ route('pelanggan.cart.index') }}"
+                            @if (request()->routeIs('pelanggan.cart.index')) aria-current="page" @endif
+                            class="relative w-10 h-10 inline-flex items-center justify-center rounded-lg border {{ request()->routeIs('pelanggan.cart.index') ? 'border-sky-300 bg-sky-50 text-sky-700' : 'border-slate-200 text-slate-700 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50/60' }} transition-colors"
+                            aria-label="Keranjang{{ $cartCount > 0 ? " ({$cartCount} layanan)" : '' }}"
+                            title="Keranjang"
+                        >
+                            <x-icon name="cart" class="w-5 h-5" />
                             @if ($cartCount > 0)
-                                <span class="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-extrabold leading-5 text-center" aria-label="{{ $cartCount }} layanan di keranjang">{{ $cartCount }}</span>
+                                <span class="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-extrabold leading-5 text-center" aria-hidden="true">{{ $cartCount }}</span>
                             @endif
                         </a>
                         <a
@@ -113,7 +123,21 @@
             </div>
 
             <!-- Mobile Hamburger Button -->
-            <div class="flex items-center md:hidden">
+            <div class="flex items-center gap-1 md:hidden">
+                @auth
+                    @if (auth()->user()->isPelanggan())
+                        <a
+                            href="{{ route('pelanggan.cart.index') }}"
+                            class="relative p-2 rounded-lg text-slate-600 hover:text-sky-600 hover:bg-slate-100"
+                            aria-label="Keranjang{{ $cartCount > 0 ? " ({$cartCount} layanan)" : '' }}"
+                        >
+                            <x-icon name="cart" class="w-6 h-6" />
+                            @if ($cartCount > 0)
+                                <span class="absolute top-0 right-0 min-w-4 h-4 px-1 rounded-full bg-amber-400 text-slate-900 text-[9px] font-extrabold leading-4 text-center" aria-hidden="true">{{ $cartCount }}</span>
+                            @endif
+                        </a>
+                    @endif
+                @endauth
                 <button
                     type="button"
                     x-on:click="mobileOpen = !mobileOpen"
@@ -164,8 +188,15 @@
                         href="{{ route('pelanggan.pesan.index') }}"
                         class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg"
                     >
+                        <x-icon name="plus" class="w-4 h-4" />
+                        Pesan Layanan
+                    </a>
+                    <a
+                        href="{{ route('pelanggan.cart.index') }}"
+                        class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg"
+                    >
                         <x-icon name="cart" class="w-4 h-4" />
-                        Pesan Layanan{{ $cartCount > 0 ? " ({$cartCount} di keranjang)" : '' }}
+                        Keranjang{{ $cartCount > 0 ? " ({$cartCount} layanan)" : '' }}
                     </a>
                 @endif
                 <a
