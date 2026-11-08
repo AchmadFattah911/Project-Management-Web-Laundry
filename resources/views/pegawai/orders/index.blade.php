@@ -24,6 +24,10 @@
         openManage(order) {
             this.selectedOrder = order;
             this.manageModalOpen = true;
+        },
+        // Urutan status untuk menonaktifkan pilihan mundur (status pesanan hanya boleh maju)
+        statusRank(status) {
+            return {{ Js::from(\App\Models\Order::STATUSES) }}.indexOf(status);
         }
     }"
     class="space-y-6"
@@ -445,17 +449,22 @@
                                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">
                                     Ubah Status Pesanan
                                 </h4>
-                                <form :action="'/pegawai/orders/' + selectedOrder.id" method="POST" class="flex items-center gap-3">
+                                <form
+                                    :action="'/pegawai/orders/' + selectedOrder.id"
+                                    method="POST"
+                                    class="flex items-center gap-3"
+                                    @submit="if ($event.target.status.value === 'selesai' && selectedOrder.status !== 'selesai' && ! confirm('Tandai pesanan ' + selectedOrder.order_code + ' sebagai SELESAI (sudah diambil pelanggan)?\n\nSetelah selesai, status tidak bisa diubah lagi oleh pegawai.')) $event.preventDefault()"
+                                >
                                     @csrf
                                     @method('PUT')
                                     <select
                                         name="status"
                                         class="flex-1 rounded-xl border border-slate-300 py-2 px-3 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
                                     >
-                                        <option value="pending" :selected="selectedOrder.status === 'pending'">Menunggu (Pending)</option>
-                                        <option value="diproses" :selected="selectedOrder.status === 'diproses'">Diproses (Washing/Drying)</option>
-                                        <option value="siap_diambil" :selected="selectedOrder.status === 'siap_diambil'">Siap Diambil</option>
-                                        <option value="selesai" :selected="selectedOrder.status === 'selesai'">Selesai (Sudah Diambil)</option>
+                                        <option value="pending" :selected="selectedOrder.status === 'pending'" :disabled="statusRank('pending') < statusRank(selectedOrder.status) || (selectedOrder.status === 'selesai' && 'pending' !== 'selesai')">Menunggu (Pending)</option>
+                                        <option value="diproses" :selected="selectedOrder.status === 'diproses'" :disabled="statusRank('diproses') < statusRank(selectedOrder.status) || (selectedOrder.status === 'selesai' && 'diproses' !== 'selesai')">Diproses (Washing/Drying)</option>
+                                        <option value="siap_diambil" :selected="selectedOrder.status === 'siap_diambil'" :disabled="statusRank('siap_diambil') < statusRank(selectedOrder.status) || (selectedOrder.status === 'selesai' && 'siap_diambil' !== 'selesai')">Siap Diambil</option>
+                                        <option value="selesai" :selected="selectedOrder.status === 'selesai'" :disabled="statusRank('selesai') < statusRank(selectedOrder.status) || (selectedOrder.status === 'selesai' && 'selesai' !== 'selesai')">Selesai (Sudah Diambil)</option>
                                     </select>
                                     <button
                                         type="submit"

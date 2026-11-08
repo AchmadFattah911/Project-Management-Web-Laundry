@@ -32,7 +32,8 @@ class CheckoutService
     public const IDEMPOTENCY_SCOPE = 'checkout';
 
     public function __construct(
-        protected OrderService $orderService
+        protected OrderService $orderService,
+        protected OrderStateMachine $stateMachine
     ) {}
 
     /**
@@ -89,6 +90,8 @@ class CheckoutService
                     'submission_token' => $token,
                 ]);
 
+                $this->stateMachine->recordCreated($checkout, $lockedUser, 'Transaksi dibuat dari keranjang');
+
                 $total = 0;
 
                 foreach ($orderable as $item) {
@@ -101,7 +104,7 @@ class CheckoutService
                         'notes'          => $item->notes,
                         'customer_name'  => $user->name,
                         'customer_phone' => $phone,
-                    ]);
+                    ], actor: $lockedUser);
 
                     $total += Rupiah::parse($order->total_price);
                 }

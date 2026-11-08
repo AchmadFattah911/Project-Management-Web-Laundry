@@ -17,16 +17,18 @@ class OrderService
 {
     public function __construct(
         protected PaymentService $payments,
-        protected IdempotencyService $idempotency
+        protected IdempotencyService $idempotency,
+        protected OrderStateMachine $stateMachine
     ) {}
 
     /**
      * Membuat pesanan baru dalam DB Transaction.
      * Menolak jika layanan berstatus bukan 'tersedia'.
+     * $actor = yang membuat pesanan (pelanggan saat checkout, admin/pegawai di kasir), dicatat di riwayat status.
      */
-    public function create(array $data, ?User $user = null): Order
+    public function create(array $data, ?User $user = null, ?User $actor = null): Order
     {
-        return DB::transaction(function () use ($data, $user) {
+        return DB::transaction(function () use ($data, $user, $actor) {
             $service = Service::findOrFail($data['service_id']);
 
             if ($service->status !== 'tersedia') {
@@ -74,6 +76,8 @@ class OrderService
                 ]);
             }
 
+            $this->stateMachine->recordCreated($order, $actor ?? $user);
+
             return $order;
         });
     }
@@ -99,7 +103,7 @@ class OrderService
             user: $actor,
             payload: Arr::except($data, 'submission_token'),
             callback: fn () => DB::transaction(function () use ($data, $actor, $token) {
-                $order = $this->create($this->walkInAttributes($data));
+                $order = $this->create($this->walkInAttributes($data), actor: $actor);
 
                 $payment = $this->payments->recordAtCashier(
                     $order,
@@ -175,23 +179,13 @@ class OrderService
     }
 
     /**
-     * Update status pesanan (pending → diproses → siap_diambil → selesai).
-     * Validasi role pegawai/admin.
+     * Update status pesanan (pending → diproses → siap_diambil → selesai) lewat OrderStateMachine:
+     * hanya admin/pegawai, hanya setelah lunas, hanya maju; mundur = koreksi admin dengan catatan wajib.
      */
-    public function updateStatus(Order $order, string $newStatus, User $actor): Order
+    public function updateStatus(Order $order, string $newStatus, User $actor, ?string $note = null): Order
     {
-        $role = $actor->role instanceof UserRole ? $actor->role->value : (string) $actor->role;
-        if (!in_array($role, ['admin', 'pegawai'])) {
-            throw new InvalidArgumentException("Hanya admin atau pegawai yang berwenang mengubah status pesanan.");
-        }
+        $this->stateMachine->transitionOrder($order, $newStatus, $actor, $note);
 
-        if (!in_array($newStatus, Order::STATUSES, true)) {
-            throw new InvalidArgumentException("Status '{$newStatus}' tidak valid.");
-        }
-
-        $this->assertPaid($order);
-
-        $order->update(['status' => $newStatus]);
         return $order;
     }
 

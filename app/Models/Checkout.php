@@ -55,6 +55,14 @@ class Checkout extends Model
         return $this->hasMany(Order::class);
     }
 
+    /**
+     * Riwayat perubahan status (lihat OrderStateMachine), urut kronologis.
+     */
+    public function statusLogs()
+    {
+        return $this->hasMany(OrderStatusLog::class)->orderBy('id');
+    }
+
     public function payments()
     {
         return $this->hasMany(Payment::class);

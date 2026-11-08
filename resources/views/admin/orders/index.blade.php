@@ -490,7 +490,7 @@
                                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">
                                     1. Ubah Status Pesanan
                                 </h4>
-                                <form :action="'/admin/orders/' + selectedOrder.id" method="POST" class="flex items-center gap-3">
+                                <form :action="'/admin/orders/' + selectedOrder.id" method="POST" class="flex flex-wrap items-center gap-3">
                                     @csrf
                                     @method('PUT')
                                     <select
@@ -508,6 +508,13 @@
                                     >
                                         Simpan Status
                                     </button>
+                                    <input
+                                        type="text"
+                                        name="status_note"
+                                        maxlength="500"
+                                        placeholder="Catatan koreksi (wajib jika status dimundurkan; pesanan selesai maks. 24 jam)"
+                                        class="basis-full rounded-xl border border-slate-300 py-2 px-3 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
+                                    />
                                 </form>
                             </div>
 

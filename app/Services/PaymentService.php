@@ -42,7 +42,8 @@ class PaymentService
     public const OFFLINE_METHODS = ['cash', 'transfer', 'e-wallet'];
 
     public function __construct(
-        protected IdempotencyService $idempotency
+        protected IdempotencyService $idempotency,
+        protected OrderStateMachine $stateMachine
     ) {}
 
     /**
@@ -324,7 +325,7 @@ class PaymentService
                 'meta'    => $meta,
             ]);
 
-            $this->markOwnerPaid($payment);
+            $this->markOwnerPaid($payment, OrderStateMachine::ACTOR_WEBHOOK, note: "Lunas via {$payment->gateway} ({$payment->reference})");
         } elseif (in_array($notification->status, [Payment::STATUS_FAILED, Payment::STATUS_EXPIRED], true)
             && $payment->status === Payment::STATUS_PENDING) {
             $payment->update([
@@ -389,7 +390,7 @@ class PaymentService
                 ]);
             }
 
-            $this->markOwnerPaid($payment);
+            $this->markOwnerPaid($payment, OrderStateMachine::ACTOR_ADMIN, $actor, "Dilunasi manual oleh admin ({$method})");
 
             return $payment;
         });
@@ -476,16 +477,17 @@ class PaymentService
      * Setelah lunas: tagihan lain yang masih terbuka ditutup (agar tidak dibayar dua kali)
      * dan status transaksi keranjang ikut menjadi lunas.
      */
-    protected function markOwnerPaid(Payment $payment): void
+    protected function markOwnerPaid(Payment $payment, string $actorType, ?User $actor = null, ?string $note = null): void
     {
+        // Urutan lock: checkout dulu (lewat state machine), baru baris payment lain
+        if ($payment->checkout_id) {
+            $this->stateMachine->transitionCheckout($payment->checkout, Checkout::STATUS_PAID, $actorType, $actor, $note);
+        }
+
         $this->ownerPayments($payment)
             ->where('status', Payment::STATUS_PENDING)
             ->whereKeyNot($payment->id)
             ->update(['status' => Payment::STATUS_EXPIRED]);
-
-        if ($payment->checkout_id) {
-            Checkout::whereKey($payment->checkout_id)->update(['status' => Checkout::STATUS_PAID]);
-        }
     }
 
     protected function expirePending(HasMany $payments, ?int $exceptId = null): void

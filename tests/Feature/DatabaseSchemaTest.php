@@ -50,6 +50,8 @@ class DatabaseSchemaTest extends TestCase
 
         $indexes = collect(Schema::getIndexes('checkouts'))->map(fn ($i) => implode(',', $i['columns']));
         $this->assertContains('status,payment_deadline', $indexes);
+
+        $this->assertTrue(Schema::hasColumns('order_status_logs', ['checkout_id', 'order_id', 'from_status', 'to_status', 'note', 'actor_type', 'actor_id', 'created_at']));
     }
 
     public function test_kunci_unik_penjaga_idempotency_ada_di_database(): void

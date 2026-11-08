@@ -77,6 +77,8 @@ class OrderController extends Controller
     {
         $validated = $request->validate([
             'status'      => ['nullable', 'string', Rule::in(Order::STATUSES)],
+            // Wajib untuk koreksi mundur (dicek di OrderStateMachine)
+            'status_note' => ['nullable', 'string', 'max:500'],
             'machine_qty' => 'nullable|integer|min:1|max:20',
         ]);
 
@@ -86,7 +88,7 @@ class OrderController extends Controller
             }
 
             if (isset($validated['status']) && $validated['status'] != $order->status) {
-                $this->orderService->updateStatus($order, $validated['status'], auth()->user());
+                $this->orderService->updateStatus($order, $validated['status'], auth()->user(), $validated['status_note'] ?? null);
             }
 
             return back()->with('success', 'Pesanan berhasil diperbarui.');
