@@ -239,11 +239,24 @@ class PaymentFlowTest extends TestCase
         $this->assertSame($second->id, $order->fresh()->load('payments')->paymentForDisplay()->id);
     }
 
+    public function test_klik_bayar_berulang_pada_order_tunggal_tetap_satu_tagihan(): void
+    {
+        [$order, $payment] = $this->placeOrder();
+
+        foreach (range(1, 2) as $i) {
+            $this->actingAs($this->pelanggan)->post(route('pelanggan.orders.pay', $order), ['payment_method' => 'transfer'])
+                ->assertRedirect($payment->checkout_url);
+        }
+
+        $this->assertSame($payment->id, $order->payments()->sole()->id);
+        $this->assertSame('pending', $payment->fresh()->status);
+    }
+
     public function test_hanya_ada_satu_tagihan_aktif_dan_dana_di_tagihan_lama_tidak_hilang(): void
     {
         [$order, $first] = $this->placeOrder();
 
-        $this->actingAs($this->pelanggan)->post(route('pelanggan.orders.pay', $order), ['payment_method' => 'transfer']);
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.orders.pay', $order), ['payment_method' => 'e-wallet']);
         $second = $order->payments()->latest('id')->first();
 
         $this->assertSame('expired', $first->fresh()->status);
@@ -259,7 +272,7 @@ class PaymentFlowTest extends TestCase
     public function test_bayar_ganda_tidak_membuat_lunas_dua_kali_dan_ditandai_refund(): void
     {
         [$order, $first] = $this->placeOrder();
-        $this->actingAs($this->pelanggan)->post(route('pelanggan.orders.pay', $order), ['payment_method' => 'transfer']);
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.orders.pay', $order), ['payment_method' => 'e-wallet']);
         $second = $order->payments()->latest('id')->first();
 
         $this->sendWebhook($second, 'paid')->assertOk();
@@ -306,15 +319,15 @@ class PaymentFlowTest extends TestCase
     public function test_konfirmasi_kasir_melunasi_tagihan_yang_ada_tanpa_baris_baru(): void
     {
         [$order, $payment] = $this->placeOrder();
-        $pegawai = $this->makeUser(UserRole::PEGAWAI);
+        $admin = $this->makeUser(UserRole::ADMIN);
 
-        $this->actingAs($pegawai)->post(route('pegawai.orders.payment', $order), ['method' => 'cash'])
+        $this->actingAs($admin)->post(route('admin.orders.payment', $order), ['method' => 'cash'])
             ->assertSessionHas('success');
 
         $payment->refresh();
         $this->assertSame('paid', $payment->status);
         $this->assertSame('cash', $payment->method);
-        $this->assertSame($pegawai->id, $payment->meta['confirmed_by']);
+        $this->assertSame($admin->id, $payment->meta['confirmed_by']);
         $this->assertSame(1, $order->payments()->count());
     }
 
@@ -339,17 +352,13 @@ class PaymentFlowTest extends TestCase
         $pegawai = $this->makeUser(UserRole::PEGAWAI);
 
         $this->actingAs($pegawai)->post(route('pegawai.orders.store'), [
-            'service_id' => $service->id, 'machine_qty' => 1, 'customer_name' => 'Lunas', 'payment_method' => 'cash', 'is_paid' => '1',
-        ]);
-        $this->actingAs($pegawai)->post(route('pegawai.orders.store'), [
-            'service_id' => $service->id, 'machine_qty' => 1, 'customer_name' => 'Belum', 'payment_method' => 'transfer',
+            'service_id' => $service->id, 'machine_qty' => 1, 'customer_name' => 'Lunas', 'payment_method' => 'cash',
+            'cash_received' => 15000, 'submission_token' => (string) \Illuminate\Support\Str::uuid(),
         ]);
 
         $paid = Order::where('customer_name', 'Lunas')->first()->payments()->first();
-        $unpaid = Order::where('customer_name', 'Belum')->first()->payments()->first();
 
         $this->assertSame(['manual', 'paid'], [$paid->gateway, $paid->status]);
-        $this->assertSame(['manual', 'pending'], [$unpaid->gateway, $unpaid->status]);
     }
 
     // ── Laporan admin ───────────────────────────────────────────────

@@ -124,7 +124,7 @@
                             </div>
                         </template>
 
-                        <!-- Ganti metode = tagihan baru dengan key baru; tagihan lama otomatis ditutup -->
+                        <!-- Metode lain = token baru = tagihan baru (yang lama ditutup); metode yang sama tetap tagihan ini -->
                         <div x-data="{ change: false }" class="border-t border-slate-100 pt-3">
                             <button type="button" x-on:click="change = ! change" class="text-xs font-bold text-slate-600 hover:text-sky-700">
                                 <span x-text="change ? 'Batal ganti metode' : 'Ganti metode pembayaran'">Ganti metode pembayaran</span>

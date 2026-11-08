@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\IdempotencyException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
@@ -11,6 +12,7 @@ use App\Services\OrderService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 class OrderController extends Controller
 {
@@ -36,7 +38,7 @@ class OrderController extends Controller
                    ->orWhereHas('service', fn($s) => $s->where('name', 'like', "%{$search}%"));
             }))
             ->when($status, fn($q) => $q->where('status', $status))
-            // Belum lunas = tidak punya pembayaran paid (termasuk gagal/kadaluarsa), juga lewat checkout
+            // Menunggu pembayaran = tidak punya pembayaran paid (termasuk gagal/kadaluarsa), juga lewat checkout
             ->paymentStatus($paymentStatus)
             ->when($date, fn($q) => $q->whereDate('created_at', $date))
             ->latest();
@@ -61,11 +63,14 @@ class OrderController extends Controller
     public function store(StoreOrderRequest $request)
     {
         try {
-            $this->orderService->create($request->validated());
-            return back()->with('success', 'Pesanan berhasil dibuat.');
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage())->withInput();
+            $result = $this->orderService->createWalkIn($request->validated(), $request->user());
+        } catch (InvalidArgumentException|IdempotencyException $e) {
+            return back()->with('error', $e->getMessage())->withInput($request->except('submission_token'));
         }
+
+        return back()->with('success', $result['replayed']
+            ? "Pesanan {$result['response']['order_code']} sudah tersimpan, tidak dibuat ulang."
+            : 'Pesanan berhasil dibuat.');
     }
 
     public function update(Request $request, Order $order)

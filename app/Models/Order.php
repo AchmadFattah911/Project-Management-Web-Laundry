@@ -73,7 +73,8 @@ class Order extends Model
     }
 
     /**
-     * Filter status pembayaran: 'paid' = lunas, 'pending' = belum lunas (termasuk gagal/kadaluarsa).
+     * Filter status pembayaran: 'paid' = lunas, 'pending' = belum dibayar (termasuk gagal/kadaluarsa).
+     * Pesanan yang belum dibayar belum sah: pegawai hanya bekerja dengan 'paid'.
      * Order dari keranjang dianggap lunas jika tagihan checkout-nya lunas.
      * Dipanggil via Order::paymentStatus('paid')
      */

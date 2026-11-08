@@ -11,7 +11,7 @@
             Kembali pilih layanan
         </a>
         <h1 class="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Keranjang Layanan</h1>
-        <p class="text-sm text-slate-500 mt-1">Cek layanan yang sudah kamu pilih. Ubah jumlah mesin atau hapus sebelum lanjut ke detail pemesanan.</p>
+        <p class="text-sm text-slate-500 mt-1">Centang layanan yang ingin dibayar sekarang. Layanan yang tidak dicentang tetap tersimpan di keranjang.</p>
     </div>
 
     <div id="keranjang">

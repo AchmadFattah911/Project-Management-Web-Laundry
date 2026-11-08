@@ -5,15 +5,15 @@
 @section('content')
 <div
     x-data="{
-        walkInModalOpen: false,
+        walkInModalOpen: {{ old('service_id') ? 'true' : 'false' }},
         manageModalOpen: false,
         selectedOrder: null,
-        customerType: 'walkin',
+        customerType: '{{ old('user_id') ? 'registered' : 'walkin' }}',
         userId: '',
         customerName: '',
         customerPhone: '',
-        serviceId: '{{ $services->first()?->id ?? '' }}',
-        qty: 1,
+        serviceId: '{{ (int) old('service_id', $services->first()?->id ?? 0) }}',
+        qty: {{ (int) old('machine_qty', 1) }},
         services: {{ Js::from($services) }},
         get selectedService() {
             return this.services.find(s => s.id == this.serviceId) || null;
@@ -129,6 +129,7 @@
                             <div class="text-[11px] text-slate-500">
                                 {{ $order->customer_phone ?? $order->user?->phone ?? '-' }}
                             </div>
+                            <x-order-checkout-info :order="$order" />
                         </td>
                         <td class="px-5 py-4">
                             <div class="font-semibold text-slate-800 text-xs">{{ $order->service?->name ?? 'Layanan' }}</div>
@@ -171,7 +172,6 @@
                                         'unit' => $order->service?->unit ?? 'Mesin',
                                         'payment_status' => $payStatus,
                                         'payment_method' => $payment?->method ?? 'cash',
-                                        'can_edit_qty' => in_array($order->status, ['pending', 'diproses']),
                                     ]) }})"
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs transition-colors"
                                 >
@@ -249,7 +249,7 @@
                     </button>
                 </div>
 
-                <form action="{{ route('pegawai.orders.store') }}" method="POST" class="p-6 space-y-4">
+                <form action="{{ route('pegawai.orders.store') }}" method="POST" class="p-6 space-y-4" x-data="{ sending: false }" @submit="sending = true">
                     @csrf
 
                     <!-- Tipe Pelanggan (Walk-in vs Terdaftar) -->
@@ -282,6 +282,9 @@
                                 <input
                                     type="text"
                                     name="customer_name"
+                                    value="{{ old('customer_name') }}"
+                                    :disabled="customerType !== 'walkin'"
+                                    maxlength="255"
                                     placeholder="Nama Lengkap Pelanggan Walk-in *"
                                     :required="customerType === 'walkin'"
                                     class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
@@ -291,6 +294,9 @@
                                 <input
                                     type="tel"
                                     name="customer_phone"
+                                    value="{{ old('customer_phone') }}"
+                                    :disabled="customerType !== 'walkin'"
+                                    maxlength="20"
                                     placeholder="Nomor Telepon / WhatsApp Pelanggan (08xxxx) *"
                                     :required="customerType === 'walkin'"
                                     class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
@@ -302,13 +308,14 @@
                         <div x-show="customerType === 'registered'">
                             <select
                                 name="user_id"
+                                :disabled="customerType !== 'registered'"
                                 :required="customerType === 'registered'"
                                 class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
                             >
                                 <option value="">-- Pilih Akun Pelanggan --</option>
                                 @foreach ($customers as $cust)
-                                    <option value="{{ $cust->id }}">
-                                        {{ $cust->name }} ({{ $cust->phone ?: 'No telp -' }})
+                                    <option value="{{ $cust->id }}" @selected((int) old('user_id') === $cust->id)>
+                                        {{ $cust->name }} ({{ $cust->maskedPhone() }})
                                     </option>
                                 @endforeach
                             </select>
@@ -365,45 +372,7 @@
                         </div>
                     </div>
 
-                    <!-- Pembayaran di Kasir -->
-                    <div class="rounded-xl p-4 bg-slate-50 border border-slate-200 space-y-3">
-                        <span class="block text-xs font-bold uppercase tracking-wider text-slate-800">
-                            Pencatatan Pembayaran Kasir
-                        </span>
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label for="walkin-payment-method" class="block text-[11px] font-semibold text-slate-600 mb-1">Metode Bayar</label>
-                                <select
-                                    id="walkin-payment-method"
-                                    name="payment_method"
-                                    class="w-full rounded-lg border border-slate-300 py-1.5 px-2.5 text-xs text-slate-900 bg-white"
-                                >
-                                    <option value="cash">Tunai (Cash)</option>
-                                    <option value="transfer">Transfer Bank</option>
-                                    <option value="e-wallet">QRIS / E-Wallet</option>
-                                </select>
-                            </div>
-                            <div class="flex items-center pt-5">
-                                <label class="inline-flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        name="is_paid"
-                                        value="1"
-                                        checked
-                                        class="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                                    />
-                                    <span class="text-xs font-bold text-slate-800">Sudah Lunas</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- Live Estimation -->
-                        <div class="pt-2 border-t border-slate-200 flex items-center justify-between">
-                            <span class="text-xs font-bold text-slate-700">Total Biaya (Estimasi):</span>
-                            <span class="text-sm font-extrabold text-sky-700" x-text="'Rp ' + estimatedTotal.toLocaleString('id-ID') + ' (estimasi)'"></span>
-                        </div>
-                    </div>
+                    <x-cashier-payment />
 
                     <div class="pt-2 flex items-center justify-end gap-3">
                         <button
@@ -415,9 +384,10 @@
                         </button>
                         <button
                             type="submit"
-                            class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md transition-colors"
+                            :disabled="sending"
+                            class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-slate-950 font-extrabold text-xs shadow-md transition-colors"
                         >
-                            Simpan & Cetak Pesanan
+                            Terima Pembayaran & Simpan
                         </button>
                     </div>
                 </form>
@@ -473,7 +443,7 @@
                             <!-- Section 1: Ubah Status Order -->
                             <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
                                 <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">
-                                    1. Ubah Status Pesanan
+                                    Ubah Status Pesanan
                                 </h4>
                                 <form :action="'/pegawai/orders/' + selectedOrder.id" method="POST" class="flex items-center gap-3">
                                     @csrf
@@ -496,85 +466,23 @@
                                 </form>
                             </div>
 
-                            <!-- Section 2: Ubah Machine Qty (Hanya Pending / Diproses) -->
+                            <!-- Ringkasan pembayaran: hanya baca, pegawai tidak bisa mengubah status pembayaran -->
                             <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
                                 <div class="flex items-center justify-between">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">
-                                        2. Ubah Jumlah Mesin
-                                    </h4>
-                                    <span class="text-[11px] font-semibold text-slate-500" x-text="'Saat ini: ' + selectedOrder.machine_qty + ' unit'"></span>
-                                </div>
-
-                                <template x-if="selectedOrder.can_edit_qty">
-                                    <form :action="'/pegawai/orders/' + selectedOrder.id" method="POST" class="flex items-center gap-3">
-                                        @csrf
-                                        @method('PUT')
-                                        <input
-                                            type="number"
-                                            name="machine_qty"
-                                            :value="selectedOrder.machine_qty"
-                                            min="1"
-                                            max="20"
-                                            required
-                                            class="w-24 rounded-xl border border-slate-300 py-2 text-center text-xs font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
-                                        />
-                                        <span class="text-xs text-slate-500">Unit Mesin</span>
-                                        <button
-                                            type="submit"
-                                            class="ml-auto px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors shrink-0"
-                                        >
-                                            Hitung Ulang & Simpan
-                                        </button>
-                                    </form>
-                                </template>
-
-                                <template x-if="!selectedOrder.can_edit_qty">
-                                    <div class="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
-                                        <svg class="w-4 h-4 text-amber-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                                        </svg>
-                                        <span>Jumlah mesin dikunci karena pesanan sudah berstatus <strong>siap diambil</strong> atau <strong>selesai</strong>.</span>
-                                    </div>
-                                </template>
-                            </div>
-
-                            <!-- Section 3: Konfirmasi Pembayaran Kasir -->
-                            <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800">
-                                        3. Pelunasan Pembayaran
+                                        Pembayaran
                                     </h4>
                                     <span class="text-xs font-extrabold text-slate-900" x-text="'Total: Rp ' + Number(selectedOrder.total_price).toLocaleString('id-ID')"></span>
                                 </div>
 
-                                <template x-if="selectedOrder.payment_status === 'paid'">
-                                    <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-                                        <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-                                        </svg>
-                                        <span>Pembayaran pesanan ini sudah LUNAS (<span x-text="selectedOrder.payment_method.toUpperCase()"></span>)</span>
-                                    </div>
-                                </template>
+                                <div class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                    </svg>
+                                    <span>LUNAS (<span x-text="selectedOrder.payment_method.toUpperCase()"></span>) untuk <span x-text="selectedOrder.machine_qty"></span> unit</span>
+                                </div>
 
-                                <template x-if="selectedOrder.payment_status !== 'paid'">
-                                    <form :action="'/pegawai/orders/' + selectedOrder.id + '/payment'" method="POST" class="flex items-center gap-3">
-                                        @csrf
-                                        <select
-                                            name="method"
-                                            class="flex-1 rounded-xl border border-slate-300 py-2 px-3 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
-                                        >
-                                            <option value="cash">Tunai (Cash)</option>
-                                            <option value="transfer">Transfer Bank</option>
-                                            <option value="e-wallet">QRIS / E-Wallet</option>
-                                        </select>
-                                        <button
-                                            type="submit"
-                                            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors shrink-0"
-                                        >
-                                            Konfirmasi Lunas
-                                        </button>
-                                    </form>
-                                </template>
+                                <p class="text-[11px] text-slate-500">Pembayaran, jumlah mesin, dan nominal terkunci karena pesanan sudah dibayar.</p>
                             </div>
 
                         </div>

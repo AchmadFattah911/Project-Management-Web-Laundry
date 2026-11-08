@@ -67,6 +67,15 @@ class Payment extends Model
         return $userId !== null ? (int) $userId : null;
     }
 
+    /**
+     * Dibayar pelanggan lewat gateway. Metode tidak bisa jadi patokan: transfer/e-wallet ada juga di kasir.
+     * Tagihan online yang dilunasi manual oleh petugas dihitung sebagai kasir.
+     */
+    public function isOnline(): bool
+    {
+        return $this->gateway !== self::GATEWAY_MANUAL && empty($this->meta['confirmed_by']);
+    }
+
     public function isPaid(): bool
     {
         return $this->status === self::STATUS_PAID;

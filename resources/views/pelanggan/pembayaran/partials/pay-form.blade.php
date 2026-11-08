@@ -1,6 +1,6 @@
 {{--
-    Form bayar. Membawa idempotency key unik per halaman: klik ganda / kirim ulang = key sama = diproses 1x di server.
-    Variabel: $checkout, $idempotencyKey, $buttonLabel, $selected (metode terpilih, opsional), $idPrefix
+    Form bayar. Token pembayaran dihitung server dari transaksi + metode: klik ganda, reload, atau tab ganda = 1 tagihan.
+    Variabel: $checkout, $buttonLabel, $selected (metode terpilih, opsional), $idPrefix
 --}}
 <form
     action="{{ route('pelanggan.pembayaran.pay', $checkout) }}"
@@ -10,13 +10,8 @@
     class="space-y-4"
 >
     @csrf
-    <input type="hidden" name="idempotency_key" value="{{ $idempotencyKey }}" />
 
     <x-payment-method-picker :id-prefix="$idPrefix ?? 'pay'" :selected="$selected ?? null" />
-
-    @error('idempotency_key')
-        <p class="text-xs text-rose-600">{{ $message }}</p>
-    @enderror
 
     <button
         type="submit"

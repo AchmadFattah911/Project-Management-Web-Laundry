@@ -33,6 +33,7 @@ class PaymentPageTest extends TestCase
             ['service_id' => $service->id, 'qty' => 1, 'item_type' => 'pakaian'],
         ]]);
         $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), [
+            'cart_items'       => $this->pelanggan->cartItems()->pluck('id')->all(),
             'contact_phone'    => '081234567890',
             'drop_off_date'    => now()->toDateString(),
             'agree'            => '1',
@@ -50,8 +51,7 @@ class PaymentPageTest extends TestCase
     private function pay(): Payment
     {
         $this->actingAs($this->pelanggan)->post(route('pelanggan.pembayaran.pay', $this->checkout), [
-            'idempotency_key' => (string) Str::uuid(),
-            'payment_method'  => 'transfer',
+            'payment_method' => 'transfer',
         ]);
 
         return Payment::latest('id')->firstOrFail();

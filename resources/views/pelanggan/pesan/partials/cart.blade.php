@@ -1,9 +1,19 @@
 @php
     $highlight = session('cart_highlight', []);
     $readonly = $readonly ?? false;
+    $prices = $cart['orderable']->mapWithKeys(fn ($item) => [$item->id => $item->subtotal()]);
 @endphp
 
-<section class="rounded-2xl border border-slate-200 bg-white shadow-xs" aria-labelledby="keranjang-title">
+<section
+    class="rounded-2xl border border-slate-200 bg-white shadow-xs"
+    aria-labelledby="keranjang-title"
+    @unless ($readonly)
+        x-data="cartSelection({
+            prices: {{ Js::from($prices) }},
+            fresh: {{ Js::from(array_map('strval', $highlight)) }},
+        })"
+    @endunless
+>
     <div class="px-5 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between">
         <h2 id="keranjang-title" class="flex items-center gap-2 text-base font-extrabold text-slate-900">
             <x-icon name="cart" class="w-5 h-5 text-sky-600" />
@@ -22,18 +32,36 @@
                 <x-icon name="cart" class="w-6 h-6" />
             </div>
             <p class="text-sm font-bold text-slate-700">Keranjang masih kosong</p>
-            <p class="text-xs text-slate-500 mt-1">Buka layanan di halaman Pesan, lalu klik ikon keranjang di kanan bawah layanan.</p>
+            <p class="text-xs text-slate-500 mt-1">Centang layanan di halaman Pesan, lalu klik ikon keranjang di bar bawah.</p>
             <a href="{{ route('pelanggan.pesan.index') }}" class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition-colors">
                 Pilih Layanan
             </a>
         </div>
     @else
+        @if (! $readonly && $prices->isNotEmpty())
+            <label class="px-5 py-3 border-b border-slate-100 flex items-center gap-3 text-xs font-bold text-slate-700 cursor-pointer">
+                <input type="checkbox" :checked="allSelected()" x-on:change="toggleAll($event.target.checked)" class="w-5 h-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+                Pilih semua
+            </label>
+        @endif
+
         <ul class="divide-y divide-slate-100">
             @foreach ($cart['items'] as $item)
                 @php $isNew = in_array($item->id, $highlight, true); $orderable = $item->isOrderable(); @endphp
                 <li @class(['px-5 py-4', 'bg-emerald-50/70' => $isNew, 'opacity-60' => ! $orderable])>
                     <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
+                        @if (! $readonly && $orderable)
+                            <input
+                                type="checkbox"
+                                name="cart_items[]"
+                                value="{{ $item->id }}"
+                                form="lanjut-bayar"
+                                x-model="selected"
+                                class="mt-0.5 w-5 h-5 shrink-0 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                                aria-label="Pilih {{ $item->service?->name }} untuk dibayar"
+                            />
+                        @endif
+                        <div class="min-w-0 flex-1">
                             <p class="text-sm font-bold text-slate-900 leading-snug">
                                 {{ $item->service?->name ?? 'Layanan dihapus' }}
                                 @if ($isNew)
@@ -84,28 +112,80 @@
             @endforeach
         </ul>
 
-        <div class="px-5 py-4 border-t border-slate-200 bg-slate-50/70 rounded-b-2xl space-y-3">
-            <div class="flex items-center justify-between text-xs text-slate-600">
-                <span>Total mesin</span>
-                <span class="font-bold text-slate-900">{{ $cart['machine_count'] }} mesin</span>
-            </div>
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Total</span>
-                <span class="text-lg font-extrabold text-sky-700">Rp {{ number_format($cart['total'], 0, ',', '.') }}</span>
-            </div>
-
-            @if ($readonly)
+        @if ($readonly)
+            <div class="px-5 py-4 border-t border-slate-200 bg-slate-50/70 rounded-b-2xl space-y-3">
+                <div class="flex items-center justify-between text-xs text-slate-600">
+                    <span>Total mesin</span>
+                    <span class="font-bold text-slate-900">{{ $cart['machine_count'] }} mesin</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-700">Total</span>
+                    <span class="text-lg font-extrabold text-sky-700">Rp {{ number_format($cart['total'], 0, ',', '.') }}</span>
+                </div>
                 <a href="{{ route('pelanggan.cart.index') }}" class="block text-center text-xs font-bold text-sky-700 hover:text-sky-800">
                     Ubah isi keranjang
                 </a>
-            @elseif ($cart['orderable']->isNotEmpty())
-                <a href="{{ route('pelanggan.pesan.index', ['langkah' => 'detail']) }}" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold transition-colors">
-                    Lanjut ke Detail Pesanan
-                    <x-icon name="arrow-right" class="w-4 h-4" />
-                </a>
-            @else
-                <p class="text-center text-[11px] font-semibold text-rose-600">Tidak ada layanan yang bisa dipesan di keranjang.</p>
-            @endif
-        </div>
+            </div>
+        @elseif ($prices->isEmpty())
+            <p class="px-5 py-4 border-t border-slate-200 text-center text-[11px] font-semibold text-rose-600">Tidak ada layanan yang bisa dipesan di keranjang.</p>
+        @else
+            {{-- Checkbox item terhubung ke form ini lewat atribut form="lanjut-bayar" --}}
+            <form
+                id="lanjut-bayar"
+                action="{{ route('pelanggan.pesan.index') }}"
+                method="GET"
+                class="sticky bottom-0 z-20 px-5 py-4 border-t border-slate-200 bg-white/95 backdrop-blur rounded-b-2xl"
+            >
+                <input type="hidden" name="langkah" value="detail" />
+
+                <p x-show="selected.length === 0" class="text-center text-xs font-semibold text-slate-500">Centang layanan yang ingin dibayar sekarang.</p>
+
+                <div x-show="selected.length > 0" x-cloak class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-xs">
+                        <p class="font-bold text-slate-900">Ingin melanjutkan pembayaran?</p>
+                        <p class="text-slate-500"><span x-text="selected.length"></span> layanan · <span class="font-extrabold text-sky-700" x-text="rupiah(selectedTotal())"></span></p>
+                    </div>
+                    <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold shadow-sm transition-colors">
+                        Lanjutkan
+                        <x-icon name="arrow-right" class="w-4 h-4" />
+                    </button>
+                </div>
+            </form>
+        @endif
     @endif
 </section>
+
+@unless ($readonly)
+    @push('scripts')
+    <script>
+        // Pilihan hanya kenyamanan tampilan; item, harga, dan pemiliknya tetap dicek ulang di server.
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('cartSelection', ({ prices, fresh }) => ({
+                prices,
+                selected: [],
+                init() {
+                    let saved = [];
+                    try { saved = JSON.parse(sessionStorage.getItem('lc_cart_selected')) ?? []; } catch (e) {}
+                    // Ubah jumlah mesin memuat ulang halaman: pilihan dipertahankan, layanan yang baru masuk ikut tercentang
+                    this.selected = [...new Set([...saved, ...fresh])].filter((id) => id in this.prices);
+                    this.$watch('selected', (value) => {
+                        try { sessionStorage.setItem('lc_cart_selected', JSON.stringify(value)); } catch (e) {}
+                    });
+                },
+                allSelected() {
+                    return this.selected.length === Object.keys(this.prices).length;
+                },
+                toggleAll(checked) {
+                    this.selected = checked ? Object.keys(this.prices) : [];
+                },
+                selectedTotal() {
+                    return this.selected.reduce((total, id) => total + (this.prices[id] ?? 0), 0);
+                },
+                rupiah(n) {
+                    return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+                },
+            }));
+        });
+    </script>
+    @endpush
+@endunless

@@ -5,15 +5,15 @@
 @section('content')
 <div
     x-data="{
-        createModalOpen: false,
+        createModalOpen: {{ old('service_id') ? 'true' : 'false' }},
         manageModalOpen: false,
         selectedOrder: null,
-        customerType: 'registered',
+        customerType: '{{ old('customer_name') || old('customer_phone') ? 'walkin' : 'registered' }}',
         userId: '',
         customerName: '',
         customerPhone: '',
-        serviceId: '{{ $services->first()?->id ?? '' }}',
-        qty: 1,
+        serviceId: '{{ (int) old('service_id', $services->first()?->id ?? 0) }}',
+        qty: {{ (int) old('machine_qty', 1) }},
         services: {{ Js::from($services) }},
         get selectedService() {
             return this.services.find(s => s.id == this.serviceId) || null;
@@ -123,7 +123,7 @@
                 >
                     <option value="">Status Bayar</option>
                     <option value="paid" {{ ($paymentStatus ?? '') === 'paid' ? 'selected' : '' }}>Lunas (Paid)</option>
-                    <option value="pending" {{ ($paymentStatus ?? '') === 'pending' ? 'selected' : '' }}>Belum Lunas</option>
+                    <option value="pending" {{ ($paymentStatus ?? '') === 'pending' ? 'selected' : '' }}>Menunggu Pembayaran</option>
                 </select>
             </div>
 
@@ -182,6 +182,7 @@
                             <div class="text-[11px] text-slate-500">
                                 {{ $order->customer_phone ?? $order->user?->phone ?? '-' }}
                             </div>
+                            <x-order-checkout-info :order="$order" />
                         </td>
                         <td class="px-5 py-4">
                             <div class="font-semibold text-slate-800 text-xs">{{ $order->service?->name ?? 'Layanan' }}</div>
@@ -224,7 +225,7 @@
                                         'unit' => $order->service?->unit ?? 'Mesin',
                                         'payment_status' => $payStatus,
                                         'payment_method' => $payment?->method ?? 'cash',
-                                        'can_edit_qty' => in_array($order->status, ['pending', 'diproses']),
+                                        'can_edit_qty' => in_array($order->status, ['pending', 'diproses']) && ! $order->checkout_id && ! $order->isPaid(),
                                     ]) }})"
                                     class="px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs transition-colors"
                                 >
@@ -302,7 +303,7 @@
                     </button>
                 </div>
 
-                <form action="{{ route('admin.orders.store') }}" method="POST" class="p-6 space-y-4">
+                <form action="{{ route('admin.orders.store') }}" method="POST" class="p-6 space-y-4" x-data="{ sending: false }" @submit="sending = true">
                     @csrf
 
                     <div>
@@ -331,13 +332,14 @@
                         <div x-show="customerType === 'registered'">
                             <select
                                 name="user_id"
+                                :disabled="customerType !== 'registered'"
                                 :required="customerType === 'registered'"
                                 class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
                             >
                                 <option value="">-- Pilih Akun Pelanggan --</option>
                                 @foreach ($customers as $cust)
-                                    <option value="{{ $cust->id }}">
-                                        {{ $cust->name }} ({{ $cust->phone ?: 'No telp -' }})
+                                    <option value="{{ $cust->id }}" @selected((int) old('user_id') === $cust->id)>
+                                        {{ $cust->name }} ({{ $cust->maskedPhone() }})
                                     </option>
                                 @endforeach
                             </select>
@@ -347,6 +349,9 @@
                             <input
                                 type="text"
                                 name="customer_name"
+                                value="{{ old('customer_name') }}"
+                                :disabled="customerType !== 'walkin'"
+                                maxlength="255"
                                 placeholder="Nama Pelanggan Walk-in *"
                                 :required="customerType === 'walkin'"
                                 class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
@@ -354,6 +359,9 @@
                             <input
                                 type="tel"
                                 name="customer_phone"
+                                value="{{ old('customer_phone') }}"
+                                :disabled="customerType !== 'walkin'"
+                                maxlength="20"
                                 placeholder="Nomor Telepon / WhatsApp (08xxxx) *"
                                 :required="customerType === 'walkin'"
                                 class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500"
@@ -409,16 +417,7 @@
                         </div>
                     </div>
 
-                    <div class="rounded-xl p-4 bg-sky-50/70 border border-sky-200/80 space-y-2">
-                        <div class="flex items-center justify-between text-xs text-slate-700">
-                            <span>Tarif Satuan Layanan:</span>
-                            <span class="font-semibold text-slate-900" x-text="selectedService ? 'Rp ' + Number(selectedService.price).toLocaleString('id-ID') : '-'"></span>
-                        </div>
-                        <div class="pt-2 border-t border-sky-200 flex items-center justify-between">
-                            <span class="text-xs font-bold uppercase tracking-wider text-slate-800">Total Biaya (Estimasi):</span>
-                            <span class="text-sm font-extrabold text-sky-700" x-text="'Rp ' + estimatedTotal.toLocaleString('id-ID') + ' (estimasi)'"></span>
-                        </div>
-                    </div>
+                    <x-cashier-payment />
 
                     <div class="pt-2 flex items-center justify-end gap-3">
                         <button
@@ -430,9 +429,10 @@
                         </button>
                         <button
                             type="submit"
-                            class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md transition-colors"
+                            :disabled="sending"
+                            class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-60 text-white font-bold text-xs shadow-md transition-colors"
                         >
-                            Simpan Pesanan
+                            Terima Pembayaran & Simpan
                         </button>
                     </div>
                 </form>
@@ -548,7 +548,7 @@
                                         <svg class="w-4 h-4 text-amber-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
                                         </svg>
-                                        <span>Jumlah mesin dikunci karena pesanan sudah berstatus <strong>siap diambil</strong> atau <strong>selesai</strong>.</span>
+                                        <span>Jumlah mesin dikunci karena pesanan sudah <strong>ditagih atau dibayar</strong>, atau sudah <strong>siap diambil</strong>.</span>
                                     </div>
                                 </template>
                             </div>

@@ -43,6 +43,7 @@ class BackendArchitectureTest extends TestCase
         ]]])->assertSessionHasNoErrors();
 
         $this->actingAs($pelanggan)->post(route('pelanggan.checkout.store'), [
+            'cart_items'       => $pelanggan->cartItems()->pluck('id')->all(),
             'contact_phone'    => '081234567890',
             'drop_off_date'    => now()->toDateString(),
             'agree'            => '1',
@@ -53,9 +54,8 @@ class BackendArchitectureTest extends TestCase
 
         $checkout = Checkout::sole();
         $response = $this->actingAs($pelanggan)->post(route('pelanggan.pembayaran.pay', $checkout), [
-            'idempotency_key' => (string) Str::uuid(),
-            'payment_method'  => 'transfer',
-            'amount'          => 500,
+            'payment_method' => 'transfer',
+            'amount'         => 500,
         ]);
 
         // Setelah tagihan dibuat, pelanggan diarahkan ke halaman pembayaran gateway (dummy)
@@ -363,11 +363,12 @@ class BackendArchitectureTest extends TestCase
             'status'      => 'selesai',
         ]);
 
+        // Pegawai tidak punya jalur mengubah jumlah mesin
         $response = $this->actingAs($pegawai)->put(route('pegawai.orders.update', $orderSelesai), [
             'machine_qty' => 4,
         ]);
 
-        $response->assertSessionHas('error');
+        $response->assertSessionHasErrors('status');
         $this->assertEquals(2, $orderSelesai->fresh()->machine_qty);
     }
 
@@ -397,8 +398,8 @@ class BackendArchitectureTest extends TestCase
             'status'      => 'pending',
         ]);
 
-        // Route konfirmasi pembayaran hanya untuk pegawai/admin
-        $response = $this->actingAs($pelanggan)->post(route('pegawai.orders.payment', $order), [
+        // Route konfirmasi pembayaran hanya untuk admin
+        $response = $this->actingAs($pelanggan)->post(route('admin.orders.payment', $order), [
             'method' => 'cash',
         ]);
 
@@ -417,10 +418,11 @@ class BackendArchitectureTest extends TestCase
     }
 
     /**
-     * 11. Pegawai bisa konfirmasi pembayaran.
+     * 11. Hanya admin yang bisa konfirmasi pembayaran.
      */
-    public function test_pegawai_bisa_konfirmasi_pembayaran(): void
+    public function test_hanya_admin_yang_bisa_konfirmasi_pembayaran(): void
     {
+        $admin = User::factory()->create(['role' => UserRole::ADMIN]);
         $pegawai = User::factory()->create(['role' => UserRole::PEGAWAI]);
         $service = Service::create([
             'name'     => 'Cuci Koin Kasir',
@@ -441,7 +443,7 @@ class BackendArchitectureTest extends TestCase
             'status'      => 'pending',
         ]);
 
-        $response = $this->actingAs($pegawai)->post(route('pegawai.orders.payment', $order), [
+        $response = $this->actingAs($admin)->post(route('admin.orders.payment', $order), [
             'method' => 'cash',
         ]);
 
@@ -456,7 +458,8 @@ class BackendArchitectureTest extends TestCase
 
         $payment = $order->fresh()->payments()->first();
         $this->assertNotNull($payment->paid_at);
-        $this->assertTrue($pegawai->can('update', $payment));
+        $this->assertTrue($admin->can('update', $payment));
+        $this->assertFalse($pegawai->can('update', $payment));
     }
 
     /**
@@ -613,7 +616,8 @@ class BackendArchitectureTest extends TestCase
             'customer_name'  => 'Pak Joko Walkin',
             'customer_phone' => '081233445566',
             'payment_method' => 'cash',
-            'is_paid'        => '1',
+            'cash_received'  => 40000,
+            'submission_token' => (string) \Illuminate\Support\Str::uuid(),
         ]);
 
         $response->assertSessionHas('success');

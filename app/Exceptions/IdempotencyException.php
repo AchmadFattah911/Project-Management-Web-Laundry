@@ -29,7 +29,7 @@ class IdempotencyException extends RuntimeException
 
     public static function mismatch(): self
     {
-        return new self(self::MISMATCH, 'Kode permintaan pembayaran sudah dipakai untuk transaksi lain. Muat ulang halaman lalu coba lagi.');
+        return new self(self::MISMATCH, 'Token pembayaran sudah dipakai untuk transaksi lain. Muat ulang halaman lalu coba lagi.');
     }
 
     public function httpStatus(): int

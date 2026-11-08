@@ -14,25 +14,31 @@ class DashboardController extends Controller
     {
         $today = Carbon::today();
 
+        // Hanya pesanan yang sudah dibayar yang masuk antrean pengerjaan
+        $paid = fn ($order) => $order->paymentStatus('paid');
+        $queue = fn (string $process) => OrderProcess::whereHas('order', $paid)->where('process', $process)->where('status', 'pending')->count();
+
         // Antrean proses pengerjaan cucian (Non-Self Service)
         $activeProcesses = OrderProcess::with(['order.service', 'order.user', 'pegawai'])
+            ->whereHas('order', $paid)
             ->where('status', 'pending')
             ->latest()
             ->get();
 
         // Pesanan yang butuh diproses hari ini
         $todayOrders = Order::with(['service', 'user'])
+            ->paymentStatus('paid')
             ->whereIn('status', ['pending', 'diproses'])
             ->latest()
             ->limit(10)
             ->get();
 
         $stats = [
-            'antrean_cuci'    => OrderProcess::where('process', 'cuci')->where('status', 'pending')->count(),
-            'antrean_kering'  => OrderProcess::where('process', 'kering')->where('status', 'pending')->count(),
-            'antrean_lipat'   => OrderProcess::where('process', 'lipat')->where('status', 'pending')->count(),
+            'antrean_cuci'    => $queue('cuci'),
+            'antrean_kering'  => $queue('kering'),
+            'antrean_lipat'   => $queue('lipat'),
             // Cucian yang tuntas dikerjakan hari ini (siap diambil atau sudah diambil)
-            'selesai_hari_ini'=> Order::whereIn('status', [Order::STATUS_SIAP_DIAMBIL, Order::STATUS_SELESAI])->whereDate('updated_at', $today)->count(),
+            'selesai_hari_ini'=> Order::paymentStatus('paid')->whereIn('status', [Order::STATUS_SIAP_DIAMBIL, Order::STATUS_SELESAI])->whereDate('updated_at', $today)->count(),
         ];
 
         $services = Service::aktif()->get();

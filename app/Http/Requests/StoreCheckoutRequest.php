@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests;
 
+use App\Services\CartService;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Langkah 2 halaman pemesanan: data kontak & rencana antar cucian ke outlet.
- * Isi pesanan (layanan, jumlah, harga) TIDAK diterima dari form ini, melainkan dibaca dari keranjang di server.
+ * Langkah 2 halaman pemesanan: item keranjang yang dipilih & rencana antar cucian ke outlet.
+ * Layanan, jumlah, dan harga TIDAK diterima dari form ini, melainkan dibaca dari keranjang di server.
+ * No. HP hanya diminta jika akun belum punya nomor; selain itu selalu memakai nomor di akun.
  */
 class StoreCheckoutRequest extends FormRequest
 {
@@ -28,7 +30,9 @@ class StoreCheckoutRequest extends FormRequest
         $maxDays = (int) config('laundry.drop_off_max_days', 7);
 
         return [
-            'contact_phone'    => ['required', 'string', 'regex:/^(\+62|62|0)8[0-9]{7,12}$/'],
+            'cart_items'       => ['required', 'array', 'min:1', 'max:' . CartService::maxLines()],
+            'cart_items.*'     => ['integer', 'distinct'],
+            'contact_phone'    => $this->user()->phone ? ['exclude'] : ['required', 'string', 'regex:/^(\+62|62|0)8[0-9]{7,12}$/'],
             'drop_off_date'    => ['required', 'date_format:Y-m-d', 'after_or_equal:today', 'before_or_equal:' . now()->addDays($maxDays)->toDateString()],
             'notes'            => ['nullable', 'string', 'max:1000'],
             'agree'            => ['accepted'],
@@ -41,6 +45,8 @@ class StoreCheckoutRequest extends FormRequest
         $maxDays = (int) config('laundry.drop_off_max_days', 7);
 
         return [
+            'cart_items.required'           => 'Pilih minimal satu layanan di keranjang.',
+            'cart_items.*'                  => 'Pilihan layanan tidak valid. Pilih ulang dari keranjang.',
             'contact_phone.required'        => 'Nomor HP wajib diisi agar petugas bisa menghubungi Anda.',
             'contact_phone.regex'           => 'Nomor HP tidak valid. Gunakan format 08xxxxxxxxxx atau +628xxxxxxxxxx.',
             'drop_off_date.required'        => 'Pilih rencana tanggal antar cucian ke outlet.',

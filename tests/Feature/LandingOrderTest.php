@@ -112,6 +112,9 @@ class LandingOrderTest extends TestCase
             'service_id'    => $self->id,
             'machine_qty'   => 1,
             'customer_name' => 'Walk In',
+            'payment_method' => 'cash',
+            'cash_received' => 100000,
+            'submission_token' => (string) \Illuminate\Support\Str::uuid(),
         ]);
 
         $this->assertDatabaseHas('orders', ['service_id' => $self->id, 'customer_name' => 'Walk In']);

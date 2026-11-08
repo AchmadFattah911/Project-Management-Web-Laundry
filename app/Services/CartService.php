@@ -188,12 +188,18 @@ class CartService
 
     /**
      * Ringkasan keranjang dengan harga terbaru dari server.
+     * $itemIds membatasi ringkasan ke item yang dipilih pelanggan di halaman keranjang.
      *
+     * @param  list<int>|null  $itemIds
      * @return array{items: Collection<int, CartItem>, orderable: Collection<int, CartItem>, unavailable: Collection<int, CartItem>, total: float, machine_count: int}
      */
-    public function summary(User $user): array
+    public function summary(User $user, ?array $itemIds = null): array
     {
-        $items = $user->cartItems()->with('service')->oldest('id')->get();
+        $items = $user->cartItems()
+            ->with('service')
+            ->when($itemIds !== null, fn ($q) => $q->whereKey($itemIds))
+            ->oldest('id')
+            ->get();
         $orderable = $items->filter->isOrderable()->values();
 
         return [

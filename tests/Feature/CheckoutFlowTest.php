@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\UserRole;
 use App\Models\Checkout;
 use App\Models\Order;
 use App\Models\User;
@@ -11,7 +12,7 @@ use Tests\Concerns\CreatesLaundryData;
 use Tests\TestCase;
 
 /**
- * Tahap 4: keranjang → langkah detail → 1 transaksi (checkout) berisi beberapa order.
+ * Tahap 4: pilih item keranjang → langkah detail → 1 transaksi (checkout) berisi beberapa order.
  */
 class CheckoutFlowTest extends TestCase
 {
@@ -41,7 +42,7 @@ class CheckoutFlowTest extends TestCase
     private function detail(array $overrides = []): array
     {
         return [
-            'contact_phone'    => '0812-3456-7890',
+            'cart_items'       => $this->pelanggan->cartItems()->pluck('id')->all(),
             'drop_off_date'    => now()->addDay()->toDateString(),
             'notes'            => 'Antar sore',
             'agree'            => '1',
@@ -54,20 +55,119 @@ class CheckoutFlowTest extends TestCase
     {
         $this->fillCart();
 
-        $this->actingAs($this->pelanggan)->get(route('pelanggan.pesan.index', ['langkah' => 'detail']))
+        $this->detailPage($this->pelanggan->cartItems()->pluck('id')->all())
             ->assertOk()
             ->assertSee('2. Detail & Konfirmasi Pesanan', false)
-            ->assertSee('value="081234567890"', false)
+            ->assertSee('081234567890')
+            ->assertDontSee('name="contact_phone"', false)
+            ->assertSee('name="cart_items[]"', false)
             ->assertSee('name="submission_token"', false)
             ->assertSee('Rp 115.000')
             ->assertSee('Ubah isi keranjang');
     }
 
-    public function test_langkah_detail_dengan_keranjang_kosong_dikembalikan(): void
+    private function detailPage(array $itemIds)
     {
-        $this->actingAs($this->pelanggan)->get(route('pelanggan.pesan.index', ['langkah' => 'detail']))
-            ->assertRedirect(route('pelanggan.pesan.index'))
+        return $this->actingAs($this->pelanggan)->get(route('pelanggan.pesan.index', ['langkah' => 'detail', 'cart_items' => $itemIds]));
+    }
+
+    public function test_langkah_detail_tanpa_pilihan_dikembalikan_ke_keranjang(): void
+    {
+        $this->fillCart();
+
+        $this->detailPage([])
+            ->assertRedirect(route('pelanggan.cart.index'))
             ->assertSessionHas('error');
+    }
+
+    public function test_langkah_detail_hanya_menampilkan_item_yang_dipilih(): void
+    {
+        [$lipat, $saja] = $this->fillCart();
+        $item = $this->pelanggan->cartItems()->where('service_id', $saja->id)->sole();
+
+        $this->detailPage([$item->id])
+            ->assertOk()
+            ->assertSee('Cuci Saja Uji')
+            ->assertDontSee('Cuci Lipat Uji')
+            ->assertSee('Rp 15.000');
+    }
+
+    public function test_langkah_detail_menolak_item_milik_orang_lain(): void
+    {
+        $this->fillCart();
+        $lain = $this->makeUser();
+        $item = $lain->cartItems()->create(['service_id' => $this->makeService()->id, 'qty' => 1, 'item_type' => 'pakaian']);
+
+        $this->detailPage([$item->id])->assertRedirect(route('pelanggan.cart.index'));
+    }
+
+    public function test_bayar_satu_dari_dua_layanan_sisanya_tetap_di_keranjang(): void
+    {
+        [$lipat, $saja] = $this->fillCart();
+        $item = $this->pelanggan->cartItems()->where('service_id', $saja->id)->sole();
+
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail(['cart_items' => [$item->id]]))
+            ->assertSessionHasNoErrors();
+
+        $checkout = Checkout::sole();
+        $this->assertSame([$saja->id], $checkout->orders()->pluck('service_id')->all());
+        $this->assertEquals(15000, (float) $checkout->total_amount);
+        $this->assertSame([$lipat->id], $this->pelanggan->cartItems()->pluck('service_id')->all());
+    }
+
+    public function test_checkout_menolak_item_milik_orang_lain(): void
+    {
+        $this->fillCart();
+        $lain = $this->makeUser();
+        $item = $lain->cartItems()->create(['service_id' => $this->makeService()->id, 'qty' => 1, 'item_type' => 'pakaian']);
+
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail(['cart_items' => [$item->id]]))
+            ->assertSessionHasErrors('cart');
+
+        $this->assertSame(0, Checkout::count());
+        $this->assertSame(1, $lain->cartItems()->count());
+    }
+
+    public function test_no_hp_transaksi_selalu_dari_akun_walau_form_dimanipulasi(): void
+    {
+        $this->fillCart();
+
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail(['contact_phone' => '089999999999']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('081234567890', Checkout::sole()->contact_phone);
+        $this->assertSame('081234567890', Order::first()->customer_phone);
+    }
+
+    public function test_akun_tanpa_no_hp_wajib_mengisi_dan_nomornya_disimpan_ke_akun(): void
+    {
+        $this->pelanggan->update(['phone' => null]);
+        $this->fillCart();
+
+        $this->detailPage($this->pelanggan->cartItems()->pluck('id')->all())->assertSee('name="contact_phone"', false);
+
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail())
+            ->assertSessionHasErrors('contact_phone');
+
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail(['contact_phone' => '0812-1111-2222']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('081211112222', $this->pelanggan->fresh()->phone);
+        $this->assertSame('081211112222', Order::first()->customer_phone);
+    }
+
+    public function test_pegawai_dan_admin_melihat_isian_detail_pelanggan(): void
+    {
+        $tanggal = $this->paidCheckout()->drop_off_date->translatedFormat('d M Y');
+
+        foreach ([[UserRole::PEGAWAI, 'pegawai.orders.index'], [UserRole::ADMIN, 'admin.orders.index']] as [$role, $route]) {
+            $this->actingAs($this->makeUser($role))->get(route($route))
+                ->assertOk()
+                ->assertSee('081234567890')
+                ->assertSee("Antar ke outlet: {$tanggal}")
+                ->assertSee('Antar sore')
+                ->assertSee('Wangi');
+        }
     }
 
     public function test_checkout_membuat_satu_transaksi_berisi_order_per_layanan(): void
@@ -121,7 +221,7 @@ class CheckoutFlowTest extends TestCase
         $detail = $this->detail();
         $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $detail);
 
-        $lain = $this->makeUser();
+        $lain = $this->makeUser(attributes: ['phone' => '081200000000']);
         $service = $this->makeService();
         $this->actingAs($lain)->post(route('pelanggan.cart.store'), ['items' => [['service_id' => $service->id, 'qty' => 1, 'item_type' => 'pakaian']]]);
 
@@ -136,10 +236,12 @@ class CheckoutFlowTest extends TestCase
         $this->fillCart();
 
         $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail([
-            'contact_phone' => '12345',
             'drop_off_date' => now()->subDay()->toDateString(),
             'agree'         => null,
-        ]))->assertSessionHasErrors(['contact_phone', 'drop_off_date', 'agree']);
+        ]))->assertSessionHasErrors(['drop_off_date', 'agree']);
+
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail(['cart_items' => []]))
+            ->assertSessionHasErrors('cart_items');
 
         $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail([
             'drop_off_date' => now()->addDays(8)->toDateString(),
@@ -151,23 +253,23 @@ class CheckoutFlowTest extends TestCase
 
     public function test_keranjang_kosong_tidak_bisa_checkout(): void
     {
-        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail())
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail(['cart_items' => [999999]]))
             ->assertSessionHasErrors('cart');
 
         $this->assertSame(0, Checkout::count());
     }
 
-    public function test_layanan_nonaktif_tidak_ikut_dan_tetap_di_keranjang(): void
+    public function test_pilihan_berisi_layanan_nonaktif_ditolak_dan_keranjang_utuh(): void
     {
-        [$lipat, $saja] = $this->fillCart();
+        [, $saja] = $this->fillCart();
+        $detail = $this->detail();
         $saja->update(['status' => 'tidak_tersedia']);
 
-        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $this->detail());
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.checkout.store'), $detail)
+            ->assertSessionHasErrors('cart');
 
-        $checkout = Checkout::sole();
-        $this->assertSame([$lipat->id], $checkout->orders()->pluck('service_id')->all());
-        $this->assertEquals(100000, (float) $checkout->total_amount);
-        $this->assertSame([$saja->id], $this->pelanggan->cartItems()->pluck('service_id')->all());
+        $this->assertSame(0, Checkout::count());
+        $this->assertSame(2, $this->pelanggan->cartItems()->count());
     }
 
     public function test_harga_diambil_dari_tarif_saat_checkout(): void
@@ -189,8 +291,7 @@ class CheckoutFlowTest extends TestCase
         $checkout = Checkout::sole();
 
         $this->actingAs($this->pelanggan)->post(route('pelanggan.pembayaran.pay', $checkout), [
-            'idempotency_key' => (string) Str::uuid(),
-            'payment_method'  => 'transfer',
+            'payment_method' => 'transfer',
         ]);
         $payment = $checkout->payments()->sole();
         $n = app(\App\Payments\Gateways\DummyGateway::class)->buildNotification($payment, 'paid');

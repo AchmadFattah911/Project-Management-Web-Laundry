@@ -51,6 +51,16 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Nomor HP tersamar untuk daftar pilihan: cukup mengenali orangnya tanpa membuka nomor lengkapnya.
+     */
+    public function maskedPhone(): string
+    {
+        $phone = (string) $this->phone;
+
+        return strlen($phone) > 8 ? substr($phone, 0, 4) . '****' . substr($phone, -4) : 'No telp -';
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === UserRole::ADMIN;

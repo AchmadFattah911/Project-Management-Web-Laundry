@@ -9,6 +9,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\Pegawai\DashboardController as PegawaiDashboardController;
+use App\Http\Controllers\Pegawai\FinanceController as PegawaiFinanceController;
 use App\Http\Controllers\Pegawai\OrderController as PegawaiOrderController;
 use App\Http\Controllers\Pelanggan\AccountController as PelangganAccountController;
 use App\Http\Controllers\Pelanggan\CartController as PelangganCartController;
@@ -82,7 +83,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])
 
         // Manajemen Order
         Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
-        Route::post('/orders', [AdminOrderController::class, 'store'])->name('orders.store');
+        Route::post('/orders', [AdminOrderController::class, 'store'])->middleware('throttle:30,1')->name('orders.store');
         Route::put('/orders/{order}', [AdminOrderController::class, 'update'])->name('orders.update');
         Route::delete('/orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
         Route::put('/orders/process/{process}', [AdminOrderController::class, 'updateProcess'])->name('orders.process');
@@ -107,14 +108,15 @@ Route::middleware(['auth', 'verified', 'role:pegawai'])
 
         // Manajemen Order & Kasir Walk-in
         Route::get('/orders', [PegawaiOrderController::class, 'index'])->name('orders.index');
-        Route::post('/orders', [PegawaiOrderController::class, 'store'])->name('orders.store');
+        Route::post('/orders', [PegawaiOrderController::class, 'store'])->middleware('throttle:30,1')->name('orders.store');
         Route::put('/orders/{order}', [PegawaiOrderController::class, 'update'])->name('orders.update');
 
         // Update tahapan pengerjaan (cuci, kering, lipat)
         Route::put('/orders/process/{process}', [PegawaiOrderController::class, 'updateProcess'])->name('orders.process');
 
-        // Konfirmasi pelunasan pembayaran
-        Route::post('/orders/{order}/payment', [PegawaiOrderController::class, 'confirmPayment'])->name('orders.payment');
+        // Audit & rekap keuangan (hanya baca)
+        Route::get('/keuangan', [PegawaiFinanceController::class, 'index'])->name('keuangan.index');
+        Route::get('/keuangan/export', [PegawaiFinanceController::class, 'export'])->name('keuangan.export');
     });
 
 // ─────────────────────────────────────────────

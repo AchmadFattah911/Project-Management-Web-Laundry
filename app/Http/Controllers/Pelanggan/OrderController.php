@@ -85,11 +85,11 @@ class OrderController extends Controller
         ]);
 
         try {
-            $payment = $this->paymentService->startOnlinePayment($order, $validated['payment_method']);
+            $result = $this->paymentService->pay($order, $validated['payment_method'], $request->user());
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->away($payment->checkout_url);
+        return redirect()->away($result['response']['checkout_url']);
     }
 }

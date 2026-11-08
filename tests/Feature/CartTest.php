@@ -47,6 +47,32 @@ class CartTest extends TestCase
         $this->assertDatabaseHas('cart_items', ['service_id' => $a->id, 'qty' => 2, 'notes' => 'Pisahkan putih']);
     }
 
+    public function test_satu_layanan_dipilih_menjadi_satu_baris_keranjang(): void
+    {
+        $a = $this->makeService();
+        $this->makeService();
+
+        $this->addToCart([['service_id' => $a->id, 'qty' => 1, 'item_type' => 'pakaian']]);
+
+        $this->assertSame([$a->id], $this->pelanggan->cartItems()->pluck('service_id')->all());
+    }
+
+    public function test_tombol_lanjutkan_menyimpan_pilihan_lalu_membuka_keranjang(): void
+    {
+        $a = $this->makeService();
+        $b = $this->makeService();
+
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.cart.store'), [
+            'lanjut' => '1',
+            'items'  => [
+                ['service_id' => $a->id, 'qty' => 1, 'item_type' => 'pakaian'],
+                ['service_id' => $b->id, 'qty' => 1, 'item_type' => 'pakaian'],
+            ],
+        ])->assertRedirect(route('pelanggan.cart.index'))->assertSessionHas('cart_highlight');
+
+        $this->assertSame(2, $this->pelanggan->cartItems()->count());
+    }
+
     public function test_layanan_tidak_dicentang_qty_nol_diabaikan(): void
     {
         $a = $this->makeService();
@@ -183,12 +209,14 @@ class CartTest extends TestCase
             ->assertSeeInOrder(['Cuci Lipat Uji', 'Sprei / Selimut Tipis', 'Wangi lavender', 'Rp 100.000'])
             ->assertSee('BARU')
             ->assertSee('Layanan sedang tidak tersedia, tidak ikut dipesan.')
-            ->assertSee('2 mesin')
-            ->assertSee('Lanjut ke Detail Pesanan')
+            ->assertSee('Centang layanan yang ingin dibayar sekarang.')
+            ->assertSee('Ingin melanjutkan pembayaran?')
+            ->assertSee('name="cart_items[]"', false)
+            ->assertSee('Pilih semua')
             ->assertSee(route('pelanggan.cart.update', $this->pelanggan->cartItems()->first()->id), false);
     }
 
-    public function test_halaman_pesan_mengganti_keranjang_dengan_tombol_lanjut_detail(): void
+    public function test_halaman_pesan_memakai_bar_bawah_tanpa_ikon_keranjang_per_layanan(): void
     {
         $a = $this->makeService(attributes: ['name' => 'Cuci Lipat Uji', 'price' => 50000]);
         $this->addToCart([['service_id' => $a->id, 'qty' => 2, 'item_type' => 'pakaian']]);
@@ -197,10 +225,10 @@ class CartTest extends TestCase
         $this->actingAs($this->pelanggan)
             ->get(route('pelanggan.pesan.index'))
             ->assertOk()
-            ->assertSee('Lanjut ke Detail Pemesanan')
-            ->assertSee(route('pelanggan.pesan.index', ['langkah' => 'detail']), false)
-            ->assertSee('Masukkan Cuci Lipat Uji ke keranjang')
-            ->assertSee(route('pelanggan.cart.index'), false)
+            ->assertSee('Lanjutkan')
+            ->assertSee('cartAction(', false)
+            ->assertDontSee('Masukkan Cuci Lipat Uji ke keranjang')
+            ->assertDontSee('langkah=detail', false)
             // Panel keranjang (ubah jumlah / hapus) sudah tidak ada di halaman ini
             ->assertDontSee(route('pelanggan.cart.update', $item->id), false)
             // Perkiraan muatan hanya bantuan opsional: tidak pernah dikirim sebagai input form

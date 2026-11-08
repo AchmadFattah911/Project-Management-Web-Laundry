@@ -1,8 +1,8 @@
 @php
     $tutorialSteps = [
-        ['icon' => 'washer', 'title' => 'Centang layanan', 'text' => 'Centang layanan drop-off yang diinginkan. Kartu yang dicentang akan terbuka.'],
-        ['icon' => 'package', 'title' => 'Atur jenis & jumlah', 'text' => 'Pilih jenis cucian dan jumlah mesin (bantuan hitung dari perkiraan berat bersifat opsional), lalu klik ikon keranjang di kanan bawah layanan.'],
-        ['icon' => 'cart', 'title' => 'Cek keranjang', 'text' => 'Buka ikon keranjang di header untuk mengubah jumlah atau menghapus layanan. Klik "Lanjut ke Detail Pemesanan" untuk mengisi No. HP & tanggal antar.'],
+        ['icon' => 'washer', 'title' => 'Centang layanan', 'text' => 'Centang satu atau beberapa layanan drop-off. Kartu yang dicentang akan terbuka.'],
+        ['icon' => 'package', 'title' => 'Atur jenis & jumlah', 'text' => 'Pilih jenis cucian dan jumlah mesin (bantuan hitung bersifat opsional), lalu klik ikon keranjang di bar bawah atau tombol Lanjutkan.'],
+        ['icon' => 'cart', 'title' => 'Pilih yang dibayar', 'text' => 'Di halaman keranjang, centang layanan yang ingin dibayar sekarang. Sisanya tetap tersimpan. Lanjutkan untuk mengisi tanggal antar.'],
         ['icon' => 'coin', 'title' => 'Bayar & antar', 'text' => 'Bayar online (Transfer/QRIS), lalu antar cucian ke outlet sesuai tanggal dan tunjukkan kode pesanan.'],
     ];
 @endphp

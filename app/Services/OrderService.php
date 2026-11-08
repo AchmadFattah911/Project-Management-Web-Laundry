@@ -7,12 +7,18 @@ use App\Models\Order;
 use App\Models\OrderProcess;
 use App\Models\Service;
 use App\Models\User;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class OrderService
 {
+    public function __construct(
+        protected PaymentService $payments,
+        protected IdempotencyService $idempotency
+    ) {}
+
     /**
      * Membuat pesanan baru dalam DB Transaction.
      * Menolak jika layanan berstatus bukan 'tersedia'.
@@ -69,8 +75,69 @@ class OrderService
     }
 
     /**
+     * Pesanan kasir: bayar dulu, jadi pesanan dan pelunasannya tersimpan bersama atau tidak sama sekali.
+     * Token form diproses 1x (lihat IdempotencyService); kirim ulang menerima pesanan yang sama.
+     * Harga selalu dari layanan di server, field di luar daftar ini tidak pernah sampai ke create().
+     *
+     * @return array{response: array<string, mixed>, replayed: bool}
+     */
+    public function createWalkIn(array $data, User $actor): array
+    {
+        if (! $actor->isAdmin() && ! $actor->isPegawai()) {
+            throw new InvalidArgumentException('Hanya admin atau pegawai yang dapat membuat pesanan kasir.');
+        }
+
+        $token = $data['submission_token'];
+
+        return $this->idempotency->run(
+            key: 'kasir:' . $token,
+            scope: 'cashier-order',
+            user: $actor,
+            payload: Arr::except($data, 'submission_token'),
+            callback: fn () => DB::transaction(function () use ($data, $actor, $token) {
+                $order = $this->create($this->walkInAttributes($data));
+
+                $payment = $this->payments->recordAtCashier(
+                    $order,
+                    $data['payment_method'],
+                    $actor,
+                    $token,
+                    isset($data['cash_received']) ? (int) $data['cash_received'] : null,
+                    $data['payment_reference'] ?? null,
+                );
+
+                return [
+                    'payment_id' => $payment->id,
+                    'order_code' => $order->order_code,
+                    'change'     => $payment->meta['change'] ?? 0,
+                ];
+            }),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function walkInAttributes(array $data): array
+    {
+        $attributes = Arr::only($data, ['service_id', 'machine_qty', 'item_type', 'notes', 'customer_name', 'customer_phone', 'user_id']);
+
+        if (empty($attributes['user_id'])) {
+            return $attributes;
+        }
+
+        $customer = User::where('role', UserRole::PELANGGAN->value)->find($attributes['user_id']);
+
+        if (! $customer) {
+            throw new InvalidArgumentException('Pesanan hanya bisa dibuat untuk akun pelanggan.');
+        }
+
+        return ['customer_name' => $customer->name, 'customer_phone' => $customer->phone] + $attributes;
+    }
+
+    /**
      * Update jumlah mesin dan hitung ulang total_price.
-     * Hanya untuk admin/pegawai, hanya saat status 'pending' atau 'diproses'.
+     * Hanya untuk pesanan yang belum dibayar: setelah lunas, total harus tetap sama dengan uang yang diterima.
      */
     public function updateMachineQty(Order $order, int $newQty, User $actor): Order
     {
@@ -81,6 +148,10 @@ class OrderService
 
         if (!in_array($order->status, ['pending', 'diproses'])) {
             throw new InvalidArgumentException("Jumlah mesin hanya dapat diubah saat status pesanan 'pending' atau 'diproses'.");
+        }
+
+        if ($order->checkout_id || $order->isPaid()) {
+            throw new InvalidArgumentException("Jumlah mesin tidak dapat diubah karena nominal pesanan sudah ditagih atau dibayar.");
         }
 
         if ($newQty < 1 || $newQty > 20) {
@@ -114,6 +185,8 @@ class OrderService
             throw new InvalidArgumentException("Status '{$newStatus}' tidak valid.");
         }
 
+        $this->assertPaid($order);
+
         $order->update(['status' => $newStatus]);
         return $order;
     }
@@ -134,11 +207,23 @@ class OrderService
             throw new InvalidArgumentException("Status pengerjaan '{$status}' tidak valid.");
         }
 
+        $this->assertPaid($process->order);
+
         $process->update([
             'status'     => $status,
             'updated_by' => $actor->id,
         ]);
 
         return $process;
+    }
+
+    /**
+     * Bayar dulu baru dikerjakan: pesanan yang belum dibayar tidak boleh masuk pengerjaan.
+     */
+    protected function assertPaid(Order $order): void
+    {
+        if (! $order->isPaid()) {
+            throw new InvalidArgumentException("Pesanan {$order->order_code} belum dibayar sehingga belum bisa dikerjakan.");
+        }
     }
 }

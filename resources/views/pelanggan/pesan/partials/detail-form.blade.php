@@ -13,17 +13,20 @@
 >
     @csrf
     <input type="hidden" name="submission_token" value="{{ $submissionToken }}" />
+    @foreach ($cart['orderable'] as $item)
+        <input type="hidden" name="cart_items[]" value="{{ $item->id }}" />
+    @endforeach
 
     <div class="px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100 flex items-start justify-between gap-3">
         <div>
             <h2 class="text-base font-extrabold text-slate-900">2. Detail & Konfirmasi Pesanan</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Lengkapi data di bawah. Isi pesanan diambil dari keranjang di sebelah kanan.</p>
+            <p class="text-xs text-slate-500 mt-0.5">Tentukan kapan cucian diantar ke outlet. Layanan yang dipesan ada di ringkasan.</p>
         </div>
-        <a href="{{ route('pelanggan.pesan.index') }}" class="shrink-0 text-xs font-bold text-sky-700 hover:text-sky-800">← Kembali pilih layanan</a>
+        <a href="{{ route('pelanggan.cart.index') }}" class="shrink-0 text-xs font-bold text-sky-700 hover:text-sky-800">← Kembali ke keranjang</a>
     </div>
 
     <div class="p-5 sm:p-6 space-y-5">
-        @foreach (['cart', 'submission_token'] as $key)
+        @foreach (['cart', 'cart_items', 'submission_token'] as $key)
             @error($key)
                 <x-alert type="error" :message="$message" :dismissible="false" />
             @enderror
@@ -39,26 +42,37 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <!-- No. HP -->
+            <!-- No. HP: dari akun. Input hanya muncul jika akun belum punya nomor, lalu disimpan ke akun. -->
             <div>
-                <label for="contact_phone" class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    No. HP / WhatsApp <span class="text-rose-500">*</span>
-                    <x-help-tip text="Dipakai petugas untuk mengabari jika cucian sudah selesai atau ada kendala. Tidak ditampilkan ke publik." />
-                </label>
-                <input
-                    id="contact_phone"
-                    type="tel"
-                    name="contact_phone"
-                    value="{{ old('contact_phone', $user->phone) }}"
-                    required
-                    inputmode="tel"
-                    autocomplete="tel"
-                    placeholder="08xxxxxxxxxx"
-                    class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500 @error('contact_phone') border-rose-400 @enderror"
-                />
-                @error('contact_phone')
-                    <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
-                @enderror
+                @if ($user->phone)
+                    <p class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                        No. HP / WhatsApp
+                        <x-help-tip text="Diambil dari akun Anda. Dipakai petugas untuk mengabari jika cucian sudah selesai atau ada kendala." />
+                    </p>
+                    <div class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm">
+                        <span class="font-bold text-slate-900 truncate">{{ $user->phone }}</span>
+                        <a href="{{ route('profile.edit') }}" class="shrink-0 text-xs font-bold text-sky-700 hover:text-sky-800">Ubah di profil</a>
+                    </div>
+                @else
+                    <label for="contact_phone" class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                        No. HP / WhatsApp <span class="text-rose-500">*</span>
+                        <x-help-tip text="Akun Anda belum punya nomor. Nomor ini disimpan ke akun dan dipakai petugas untuk mengabari Anda." />
+                    </label>
+                    <input
+                        id="contact_phone"
+                        type="tel"
+                        name="contact_phone"
+                        value="{{ old('contact_phone') }}"
+                        required
+                        inputmode="tel"
+                        autocomplete="tel"
+                        placeholder="08xxxxxxxxxx"
+                        class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-100 focus:border-sky-500 @error('contact_phone') border-rose-400 @enderror"
+                    />
+                    @error('contact_phone')
+                        <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
+                    @enderror
+                @endif
             </div>
 
             <!-- Rencana tanggal antar -->

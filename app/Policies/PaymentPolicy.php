@@ -29,11 +29,11 @@ class PaymentPolicy
     }
 
     /**
-     * Hanya Admin dan Pegawai yang berwenang mengubah status pembayaran menjadi 'paid'.
+     * Hanya Admin yang berwenang mengubah status pembayaran. Pegawai hanya mencatat saat pesanan kasir dibuat.
      */
     public function update(User $user, Payment $payment): bool
     {
-        return $user->isAdmin() || $user->isPegawai();
+        return $user->isAdmin();
     }
 
     /**

@@ -8,11 +8,9 @@ use App\Http\Requests\StoreCheckoutRequest;
 use App\Models\Checkout;
 use App\Models\Order;
 use App\Services\CheckoutService;
-use App\Services\IdempotencyService;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use RuntimeException;
@@ -24,14 +22,11 @@ class CheckoutController extends Controller
 {
     use AuthorizesRequests;
 
-    public const IDEMPOTENCY_SCOPE = 'checkout-payment';
-
     public const RECENT_ORDERS_LIMIT = 5;
 
     public function __construct(
         protected CheckoutService $checkoutService,
         protected PaymentService $paymentService,
-        protected IdempotencyService $idempotency,
     ) {}
 
     public function store(StoreCheckoutRequest $request)
@@ -56,8 +51,6 @@ class CheckoutController extends Controller
         return view('pelanggan.pembayaran.show', [
             'checkout'       => $checkout,
             'payment'        => $checkout->paymentForDisplay(),
-            // Key baru setiap halaman dimuat. Klik ganda / kirim ulang form yang sama = key sama = diproses 1x.
-            'idempotencyKey' => (string) Str::uuid(),
             'paymentMethods' => config('laundry.online_payment_methods', []),
         ]);
     }
@@ -71,7 +64,7 @@ class CheckoutController extends Controller
 
         if (! $checkout->isPaid()) {
             return redirect()->route('pelanggan.pembayaran.show', $checkout)
-                ->with('status', 'Transaksi ini belum lunas. Silakan selesaikan pembayaran terlebih dahulu.');
+                ->with('status', 'Transaksi ini belum dibayar. Silakan selesaikan pembayaran terlebih dahulu.');
         }
 
         $checkout->load(['orders.service', 'orders.orderProcesses', 'payments']);
@@ -112,43 +105,22 @@ class CheckoutController extends Controller
     /**
      * POST /pembayaran/{code}/bayar
      *
-     * Wajib membawa idempotency key (header "Idempotency-Key" atau field "idempotency_key").
-     * Key yang sudah pernah diproses tidak diproses lagi: hasil sebelumnya dikembalikan (tagihan yang sama).
+     * Token pembayaran dihitung server dari transaksi ini, bukan dikirim browser (lihat PaymentService::paymentToken).
+     * Token yang sudah pernah diproses tidak diproses lagi: hasil sebelumnya dikembalikan (tagihan yang sama).
      */
     public function pay(Request $request, Checkout $checkout)
     {
         $this->authorize('view', $checkout);
 
-        $request->merge(['idempotency_key' => $request->header('Idempotency-Key', $request->input('idempotency_key'))]);
-
         $validated = $request->validate([
-            'idempotency_key' => ['required', 'string', 'min:16', 'max:100', 'regex:/^[A-Za-z0-9_\-]+$/'],
-            'payment_method'  => ['required', Rule::in(PaymentService::onlineMethods())],
+            'payment_method' => ['required', Rule::in(PaymentService::onlineMethods())],
         ], [
-            'idempotency_key.*'       => 'Kode permintaan pembayaran tidak valid. Muat ulang halaman lalu coba lagi.',
             'payment_method.required' => 'Silakan pilih metode pembayaran.',
             'payment_method.in'       => 'Metode pembayaran tidak valid.',
         ]);
 
-        $key = $validated['idempotency_key'];
-
         try {
-            $result = $this->idempotency->run(
-                key: $key,
-                scope: self::IDEMPOTENCY_SCOPE,
-                user: $request->user(),
-                payload: ['checkout_id' => $checkout->id, 'payment_method' => $validated['payment_method']],
-                callback: function () use ($checkout, $validated, $key) {
-                    $payment = $this->paymentService->startCheckoutPayment($checkout, $validated['payment_method'], $key);
-
-                    return [
-                        'payment_id'   => $payment->id,
-                        'reference'    => $payment->reference,
-                        'checkout_url' => $payment->checkout_url,
-                        'status'       => $payment->status,
-                    ];
-                },
-            );
+            $result = $this->paymentService->pay($checkout, $validated['payment_method'], $request->user());
         } catch (IdempotencyException $e) {
             return $this->failed($request, $checkout, $e->getMessage(), $e->httpStatus());
         } catch (InvalidArgumentException|RuntimeException $e) {

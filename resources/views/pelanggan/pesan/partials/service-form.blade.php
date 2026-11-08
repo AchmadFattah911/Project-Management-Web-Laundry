@@ -32,15 +32,18 @@
         itemTypes: {{ Js::from($itemTypes) }},
         maxQty: {{ (int) $maxQty }},
         sel: {{ Js::from($initial) }},
+        cartCount: {{ $cart['items']->count() }},
+        cartUrl: {{ Js::from(route('pelanggan.cart.index')) }},
     })"
     x-on:submit="onSubmit($event)"
     class="rounded-2xl border border-slate-200 bg-white shadow-xs"
 >
     @csrf
+    <input type="hidden" name="lanjut" :value="proceed ? 1 : 0" />
 
     <div class="px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100">
         <h2 class="text-base font-extrabold text-slate-900">1. Pilih Layanan Drop-Off</h2>
-        <p class="text-xs text-slate-500 mt-0.5">Centang layanan untuk membuka detailnya, lalu klik ikon keranjang di kanan bawah layanan untuk memasukkannya ke keranjang.</p>
+        <p class="text-xs text-slate-500 mt-0.5">Centang satu atau beberapa layanan. Ikon keranjang di bawah menyimpan pilihan dan Anda bisa memilih lagi; tombol Lanjutkan menyimpan pilihan lalu membuka keranjang.</p>
     </div>
 
     @error('items')
@@ -204,33 +207,46 @@
                                 <p class="sm:col-span-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @endforeach
 
-                            <!-- Ikon keranjang: memasukkan HANYA layanan ini ke keranjang -->
-                            <div class="sm:col-span-2 flex items-center justify-end gap-3">
-                                <span class="text-[11px] font-semibold text-slate-500">Masukkan ke keranjang</span>
-                                <button
-                                    type="button"
-                                    x-on:click="addOne({{ $id }}, $el.form)"
-                                    :disabled="submitting"
-                                    class="relative w-11 h-11 rounded-full bg-sky-600 hover:bg-sky-700 text-white shadow-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    aria-label="Masukkan {{ $service->name }} ke keranjang"
-                                    title="Masukkan ke keranjang"
-                                >
-                                    <span x-show="adding !== {{ $id }}"><x-icon name="cart" class="w-5 h-5" /></span>
-                                    <svg x-show="adding === {{ $id }}" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" class="opacity-25" /><path d="M21 12a9 9 0 00-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
-                                    <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center" aria-hidden="true">
-                                        <x-icon name="plus" class="w-3 h-3" />
-                                    </span>
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
             @endforeach
         </div>
 
-        <!-- Lanjut ke detail pemesanan (menempel di bawah layar pada mobile; di desktop ada di kolom kanan) -->
-        <div class="lg:hidden sticky bottom-0 z-20 rounded-b-2xl border-t border-slate-200 bg-white/95 backdrop-blur px-5 sm:px-6 py-4">
-            @include('pelanggan.pesan.partials.lanjut-detail', ['compact' => true])
+        <!-- Bar bawah: ikon keranjang di kiri, tombol Lanjutkan di kanan. Muncul setelah ada layanan terpilih. -->
+        <div
+            x-show="selectedCount() > 0 || cartCount > 0"
+            @if (! collect($initial)->contains('checked', true) && $cart['items']->isEmpty()) x-cloak @endif
+            class="sticky bottom-0 z-20 rounded-b-2xl border-t border-slate-200 bg-white/95 backdrop-blur px-5 sm:px-6 py-4"
+        >
+            <div class="flex items-center gap-3">
+                <button
+                    type="button"
+                    x-on:click="cartAction($el.form)"
+                    :disabled="submitting"
+                    :aria-label="selectedCount() > 0 ? 'Masukkan layanan terpilih ke keranjang' : 'Buka keranjang'"
+                    :title="selectedCount() > 0 ? 'Masukkan layanan terpilih ke keranjang' : 'Buka keranjang'"
+                    class="relative w-11 h-11 shrink-0 rounded-lg border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <x-icon name="cart" class="w-5 h-5" />
+                    <span x-show="cartCount > 0" x-text="cartCount" class="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-amber-400 text-slate-900 text-[10px] font-extrabold leading-5 text-center" aria-hidden="true"></span>
+                </button>
+
+                <div class="min-w-0 flex-1 text-xs">
+                    <p class="font-bold text-slate-900 truncate" x-text="selectedCount() > 0 ? selectedCount() + ' layanan dipilih' : cartCount + ' layanan di keranjang'"></p>
+                    <p class="text-slate-500 truncate" x-show="selectedCount() > 0">Estimasi <span class="font-extrabold text-sky-700" x-text="rupiah(selectedTotal())"></span></p>
+                </div>
+
+                <button
+                    type="button"
+                    x-on:click="continueOrder($el.form)"
+                    :disabled="submitting"
+                    class="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                >
+                    Lanjutkan
+                    <x-icon name="arrow-right" class="w-4 h-4" />
+                </button>
+            </div>
         </div>
     @endif
 </form>
@@ -242,10 +258,19 @@
         Alpine.data('orderForm', (config) => ({
             ...config,
             submitting: false,
-            adding: null,
-            // Hanya layanan yang ikon keranjangnya diklik yang inputnya aktif (input disabled tidak ikut dikirim)
+            proceed: false,
+            // Hanya layanan yang dicentang yang inputnya aktif (input disabled tidak ikut dikirim)
             included(id) {
-                return this.sel[id].checked && (this.adding === null || this.adding === id);
+                return this.sel[id].checked;
+            },
+            selectedIds() {
+                return Object.keys(this.sel).map(Number).filter((id) => this.sel[id].checked);
+            },
+            selectedCount() {
+                return this.selectedIds().length;
+            },
+            selectedTotal() {
+                return this.selectedIds().reduce((total, id) => total + this.price(id) * (Number(this.sel[id].qty) || 0), 0);
             },
             price(id) {
                 return this.services.find((s) => s.id === id)?.price ?? 0;
@@ -269,16 +294,24 @@
             rupiah(n) {
                 return 'Rp ' + Math.round(n).toLocaleString('id-ID');
             },
-            addOne(id, form) {
-                if (this.submitting || ! this.sel[id].checked) return;
-                this.clamp(id);
-                this.adding = id;
+            save(form, proceed) {
+                if (this.submitting) return;
+                this.selectedIds().forEach((id) => this.clamp(id));
+                this.proceed = proceed;
                 this.submitting = true;
-                // Tunggu atribut disabled diperbarui Alpine, baru kirim form
+                // Tunggu nilai input diperbarui Alpine, baru kirim form
                 this.$nextTick(() => form.submit());
             },
+            cartAction(form) {
+                if (this.selectedCount() > 0) this.save(form, false);
+                else window.location.href = this.cartUrl;
+            },
+            continueOrder(form) {
+                if (this.selectedCount() > 0) this.save(form, true);
+                else window.location.href = this.cartUrl;
+            },
             onSubmit(event) {
-                // Tekan Enter di dalam input tidak mengirim form; tambah ke keranjang lewat ikon tiap layanan
+                // Tekan Enter di dalam input tidak mengirim form; simpan lewat tombol di bar bawah
                 event.preventDefault();
             },
         }));

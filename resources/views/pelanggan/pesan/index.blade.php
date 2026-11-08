@@ -12,7 +12,7 @@
                 Kembali ke Beranda
             </a>
             <h1 class="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Pesan Layanan Laundry</h1>
-            <p class="text-sm text-slate-500 mt-1">Masukkan layanan ke keranjang lewat ikon keranjang, lanjut ke detail pemesanan, lalu bayar online.</p>
+            <p class="text-sm text-slate-500 mt-1">Pilih layanan, simpan ke keranjang, pilih yang ingin dibayar, lalu bayar online.</p>
         </div>
 
         <!-- Stepper -->
@@ -23,7 +23,7 @@
     @include('pelanggan.pesan.partials.tutorial')
 
     <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        <div class="lg:col-span-2">
+        <div class="{{ $step === 'detail' ? 'lg:col-span-2' : 'lg:col-span-3' }}">
             @if ($step === 'detail')
                 @include('pelanggan.pesan.partials.detail-form')
             @else
@@ -32,14 +32,9 @@
         </div>
 
         @if ($step === 'detail')
-            {{-- Langkah detail: isi keranjang tampil sebagai ringkasan (hanya baca) untuk dikonfirmasi --}}
+            {{-- Langkah detail: item terpilih tampil sebagai ringkasan (hanya baca) untuk dikonfirmasi --}}
             <aside id="keranjang" class="lg:sticky lg:top-24 scroll-mt-24">
                 @include('pelanggan.pesan.partials.cart', ['readonly' => true])
-            </aside>
-        @else
-            {{-- Langkah pilih: keranjang ada di halaman tersendiri (ikon keranjang di header) --}}
-            <aside class="hidden lg:block lg:sticky lg:top-24">
-                @include('pelanggan.pesan.partials.lanjut-detail')
             </aside>
         @endif
     </div>

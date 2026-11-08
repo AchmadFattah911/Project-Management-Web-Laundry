@@ -11,9 +11,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Mengubah isi keranjang menjadi 1 transaksi (checkout) berisi beberapa order (1 order per layanan).
+ * Mengubah item keranjang yang dipilih menjadi 1 transaksi (checkout) berisi beberapa order (1 order per layanan).
  *
  * - Semua dalam 1 transaksi DB: checkout, order, dan pengosongan keranjang sukses bersama atau gagal bersama.
+ * - Hanya item yang dipilih pelanggan yang dipesan; sisanya tetap di keranjang.
+ * - No. HP diambil dari akun. Input hanya dipakai sekali untuk akun yang belum punya nomor.
  * - Harga dihitung ulang dari tarif layanan saat ini (lewat OrderService), tidak dari input.
  * - submission_token membuat klik "Buat Pesanan" ganda tetap menghasilkan 1 checkout.
  */
@@ -24,7 +26,7 @@ class CheckoutService
     ) {}
 
     /**
-     * @param  array{contact_phone: string, drop_off_date: string, notes?: ?string, submission_token: string}  $detail
+     * @param  array{cart_items: list<int|string>, contact_phone?: string, drop_off_date: string, notes?: ?string, submission_token: string}  $detail
      *
      * @throws ValidationException
      */
@@ -41,7 +43,8 @@ class CheckoutService
                     return $existing;
                 }
 
-                $items = $user->cartItems()->with('service')->lockForUpdate()->oldest('id')->get();
+                $selected = array_unique(array_map('intval', $detail['cart_items']));
+                $items = $user->cartItems()->with('service')->whereKey($selected)->lockForUpdate()->oldest('id')->get();
                 $orderable = $items->filter(fn (CartItem $item) => $item->isOrderable());
 
                 if ($orderable->isEmpty()) {
@@ -50,12 +53,25 @@ class CheckoutService
                     ]);
                 }
 
+                // Isi yang dibayar harus persis yang dikonfirmasi pelanggan, tidak boleh berkurang diam-diam
+                if ($orderable->count() !== count($selected)) {
+                    throw ValidationException::withMessages([
+                        'cart' => 'Sebagian layanan yang dipilih sudah berubah atau tidak tersedia. Cek kembali keranjang Anda.',
+                    ]);
+                }
+
+                $phone = $user->phone ?: $detail['contact_phone'];
+
+                if (! $user->phone) {
+                    $user->update(['phone' => $phone]);
+                }
+
                 $checkout = Checkout::create([
                     'code'             => $this->generateCode(),
                     'user_id'          => $user->id,
                     'total_amount'     => 0,
                     'status'           => Checkout::STATUS_AWAITING,
-                    'contact_phone'    => $detail['contact_phone'],
+                    'contact_phone'    => $phone,
                     'drop_off_date'    => $detail['drop_off_date'],
                     'notes'            => $detail['notes'] ?? null,
                     'submission_token' => $token,
@@ -70,13 +86,13 @@ class CheckoutService
                         'item_type'      => $item->itemTypeLabel(),
                         'notes'          => $item->notes,
                         'customer_name'  => $user->name,
-                        'customer_phone' => $detail['contact_phone'],
+                        'customer_phone' => $phone,
                     ]);
                 }
 
                 $checkout->update(['total_amount' => $checkout->orders()->sum('total_price')]);
 
-                // Hanya item yang ikut dipesan yang dihapus; item layanan nonaktif tetap terlihat di keranjang
+                // Hanya item yang ikut dipesan yang dihapus; item lain tetap menunggu di keranjang
                 CartItem::whereKey($orderable->modelKeys())->delete();
 
                 return $checkout;

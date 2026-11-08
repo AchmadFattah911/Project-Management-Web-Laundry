@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\PaymentGateway;
+use App\Exceptions\IdempotencyException;
 use App\Models\Checkout;
 use App\Models\Order;
 use App\Models\Payment;
@@ -12,9 +13,9 @@ use App\Payments\InvalidPaymentNotification;
 use App\Payments\PaymentNotification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -26,8 +27,8 @@ use Throwable;
  * - Nominal selalu diambil dari total di server (checkout / order), tidak pernah dari input user.
  * - Satu transaksi (checkout) atau satu order hanya boleh punya satu pembayaran berstatus paid.
  * - Idempotent di semua jalur:
- *     • request bayar membawa idempotency key → key sama = tagihan sama (lihat IdempotencyService),
- *       key juga diteruskan ke gateway agar gateway tidak menagih dua kali;
+ *     • token pembayaran dihitung server (lihat paymentToken) → token sama = tagihan sama (lihat IdempotencyService),
+ *       token juga diteruskan ke gateway agar gateway tidak menagih dua kali;
  *     • notifikasi gateway dicatat di payment_events → event sama hanya diterapkan sekali;
  *     • konfirmasi kasir ganda mengembalikan pembayaran lunas yang sudah ada.
  * - Pembayaran yang sudah paid tidak pernah turun status lagi.
@@ -39,6 +40,10 @@ use Throwable;
 class PaymentService
 {
     public const OFFLINE_METHODS = ['cash', 'transfer', 'e-wallet'];
+
+    public function __construct(
+        protected IdempotencyService $idempotency
+    ) {}
 
     /**
      * Metode pembayaran online yang boleh dipilih pelanggan (key dari config/laundry.php).
@@ -76,98 +81,133 @@ class PaymentService
     // ─────────────────────────────────────────────────────────────
 
     /**
-     * Pelanggan membayar transaksi keranjang. Dipanggil lewat IdempotencyService, tetapi juga aman sendiri:
-     * idempotency key yang sama selalu memakai baris payment yang sama (UNIQUE payments.idempotency_key).
+     * Token pembayaran: identitas 1 upaya bayar, dihitung server dari transaksi yang dibayar.
+     *
+     * Sengaja tidak berasal dari browser. Reload, tab ganda, atau kirim ulang saat koneksi macet selalu
+     * menghasilkan token yang sama, jadi semuanya bermuara ke 1 tagihan. Token baru hanya lahir jika
+     * metodenya berbeda atau tagihan sebelumnya sudah ditutup (gagal/kadaluarsa/diganti).
      */
-    public function startCheckoutPayment(Checkout $checkout, string $method, string $idempotencyKey): Payment
+    public function paymentToken(Checkout|Order $owner, string $method): string
+    {
+        $closedCharges = $owner->payments()
+            ->whereNotNull('reference')
+            ->where(fn ($q) => $q->where('status', '!=', Payment::STATUS_PENDING)->orWhere('expires_at', '<', now()))
+            ->count();
+
+        return hash_hmac('sha256', implode('|', [
+            $owner->getTable(),
+            $owner->getKey(),
+            $this->amountOf($owner),
+            $method,
+            $closedCharges,
+        ]), (string) config('app.key'));
+    }
+
+    /**
+     * Pelanggan membayar transaksi keranjang atau order tunggal lama.
+     * Token yang sama diproses 1x; request berikutnya menerima tagihan yang sama (replayed).
+     *
+     * @return array{response: array<string, mixed>, replayed: bool}
+     *
+     * @throws IdempotencyException
+     */
+    public function pay(Checkout|Order $owner, string $method, User $user): array
     {
         $this->assertOnlineMethod($method);
+
+        if ($owner instanceof Order && $owner->checkout_id) {
+            throw new InvalidArgumentException('Pesanan ini dibayar melalui halaman transaksi ' . ($owner->checkout?->code ?? '') . '.');
+        }
+
+        $token = $this->paymentToken($owner, $method);
+        $isCheckout = $owner instanceof Checkout;
+
+        return $this->idempotency->run(
+            key: $token,
+            scope: $isCheckout ? 'checkout-payment' : 'order-payment',
+            user: $user,
+            payload: [($isCheckout ? 'checkout_id' : 'order_id') => $owner->getKey(), 'payment_method' => $method],
+            callback: function () use ($owner, $method, $token) {
+                $payment = $this->openCharge($owner, $method, $token);
+
+                return [
+                    'payment_id'   => $payment->id,
+                    'reference'    => $payment->reference,
+                    'checkout_url' => $payment->checkout_url,
+                    'status'       => $payment->status,
+                ];
+            },
+        );
+    }
+
+    /**
+     * Membuka tagihan untuk token ini. Aman sendiri: token yang sama selalu memakai baris payment
+     * yang sama (UNIQUE payments.idempotency_key), dan hanya boleh ada 1 tagihan aktif per transaksi.
+     */
+    protected function openCharge(Checkout|Order $owner, string $method, string $token): Payment
+    {
         $gateway = $this->gateway();
 
-        $payment = DB::transaction(function () use ($checkout, $method, $idempotencyKey, $gateway) {
-            $locked = Checkout::whereKey($checkout->id)->lockForUpdate()->firstOrFail();
+        $payment = DB::transaction(function () use ($owner, $method, $token, $gateway) {
+            $locked = $owner::query()->whereKey($owner->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->isPaid()) {
-                throw new InvalidArgumentException('Transaksi ini sudah lunas.');
+                throw new InvalidArgumentException(($locked instanceof Checkout ? 'Transaksi' : 'Pesanan') . ' ini sudah lunas.');
             }
 
-            $existing = Payment::where('idempotency_key', $idempotencyKey)->first();
+            $this->assertNoChargeInFlight($locked, $token);
 
+            $existing = Payment::where('idempotency_key', $token)->first();
+
+            // Tagihan untuk token ini sudah terbentuk di gateway: jangan buat lagi
+            if ($existing?->reference) {
+                return $existing;
+            }
+
+            $this->expirePending($locked->payments(), exceptId: $existing?->id);
+
+            $attributes = [
+                'amount'  => $this->amountOf($locked),
+                'method'  => $method,
+                'gateway' => $gateway->name(),
+                'status'  => Payment::STATUS_PENDING,
+            ];
+
+            // Percobaan sebelumnya putus sebelum gateway merespons: ulangi dengan token yang sama
             if ($existing) {
-                if ((int) $existing->checkout_id !== (int) $locked->id) {
-                    throw new InvalidArgumentException('Kode permintaan pembayaran tidak cocok dengan transaksi ini.');
-                }
-
-                // Tagihan untuk key ini sudah terbentuk di gateway: jangan buat lagi
-                if ($existing->reference) {
-                    return $existing;
-                }
-
-                // Percobaan sebelumnya putus sebelum gateway merespons: ulangi dengan key yang sama
-                $this->expirePending($locked->payments(), exceptId: $existing->id);
-                $existing->update([
-                    'amount'  => $locked->total_amount,
-                    'method'  => $method,
-                    'gateway' => $gateway->name(),
-                    'status'  => Payment::STATUS_PENDING,
-                ]);
+                $existing->update($attributes);
 
                 return $existing;
             }
 
-            // Hanya boleh ada 1 tagihan aktif per transaksi
-            $this->expirePending($locked->payments());
-
-            return $locked->payments()->create([
-                'amount'          => $locked->total_amount,
-                'method'          => $method,
-                'gateway'         => $gateway->name(),
-                'status'          => Payment::STATUS_PENDING,
-                'idempotency_key' => $idempotencyKey,
-            ]);
+            return $locked->payments()->create($attributes + ['idempotency_key' => $token]);
         });
 
         if ($payment->reference) {
             return $payment;
         }
 
-        return $this->createCharge($payment, $gateway, $idempotencyKey);
+        return $this->createCharge($payment, $gateway, $token);
     }
 
     /**
-     * Pembayaran online untuk order tunggal (order lama sebelum ada keranjang).
-     * Tagihan pending sebelumnya (jika ada) ditutup agar hanya ada satu tagihan aktif.
+     * Tagihan lain (metode berbeda) yang masih menunggu respons gateway tidak boleh disalip,
+     * supaya 2 tagihan tidak terbentuk bersamaan di gateway untuk transaksi yang sama.
+     *
+     * @throws IdempotencyException
      */
-    public function startOnlinePayment(Order $order, string $method): Payment
+    protected function assertNoChargeInFlight(Checkout|Order $owner, string $token): void
     {
-        $this->assertOnlineMethod($method);
+        $inFlight = $owner->payments()
+            ->where('status', Payment::STATUS_PENDING)
+            ->whereNull('reference')
+            ->where('idempotency_key', '!=', $token)
+            ->where('updated_at', '>', now()->subSeconds((int) config('payment.idempotency.lock_seconds', 60)))
+            ->exists();
 
-        if ($order->checkout_id) {
-            throw new InvalidArgumentException('Pesanan ini dibayar melalui halaman transaksi ' . ($order->checkout?->code ?? '') . '.');
+        if ($inFlight) {
+            throw IdempotencyException::inProgress();
         }
-
-        $gateway = $this->gateway();
-        $idempotencyKey = (string) Str::uuid();
-
-        $payment = DB::transaction(function () use ($order, $method, $gateway, $idempotencyKey) {
-            $lockedOrder = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
-
-            if ($lockedOrder->isPaid()) {
-                throw new InvalidArgumentException('Pesanan ini sudah lunas.');
-            }
-
-            $this->expirePending($lockedOrder->payments());
-
-            return $lockedOrder->payments()->create([
-                'amount'          => $lockedOrder->total_price,
-                'method'          => $method,
-                'gateway'         => $gateway->name(),
-                'status'          => Payment::STATUS_PENDING,
-                'idempotency_key' => $idempotencyKey,
-            ]);
-        });
-
-        return $this->createCharge($payment, $gateway, $idempotencyKey);
     }
 
     /**
@@ -301,7 +341,8 @@ class PaymentService
     // ─────────────────────────────────────────────────────────────
 
     /**
-     * Admin/pegawai mengonfirmasi pelunasan (misal dibayar langsung di kasir atau transfer sudah dicek).
+     * Admin melunasi tagihan saat notifikasi gateway tidak pernah sampai.
+     * Pegawai tidak punya jalur untuk mengubah status pembayaran pesanan yang sudah ada.
      * Order dari keranjang dilunasi per transaksi (semua order di checkout yang sama ikut lunas).
      * Jika sudah lunas, pembayaran yang ada dikembalikan tanpa diubah.
      */
@@ -355,30 +396,55 @@ class PaymentService
     }
 
     /**
-     * Pencatatan pembayaran untuk order walk-in yang dibuat petugas di kasir.
+     * Pembayaran pesanan kasir, dicatat lengkap untuk audit: tunai menyimpan uang diterima dan kembalian,
+     * non-tunai menyimpan nomor bukti. UNIQUE payments.reference menolak 1 bukti dipakai 2 kali dan
+     * UNIQUE payments.idempotency_key menolak 1 form tersimpan 2 kali, juga saat request paralel.
      */
-    public function recordWalkIn(Order $order, string $method, bool $isPaid, User $actor): Payment
+    public function recordAtCashier(Order $order, string $method, User $actor, string $token, ?int $cashReceived, ?string $reference): Payment
     {
-        if ($isPaid) {
-            return $this->confirmManually($order, $method, $actor);
-        }
-
         if (! in_array($method, self::OFFLINE_METHODS, true)) {
             throw new InvalidArgumentException('Metode pembayaran tidak valid.');
         }
 
-        return $order->payments()->create([
-            'amount'  => $order->total_price,
-            'method'  => $method,
-            'gateway' => Payment::GATEWAY_MANUAL,
-            'status'  => Payment::STATUS_PENDING,
-            'meta'    => ['recorded_by' => $actor->id],
-        ]);
+        $isCash = $method === 'cash';
+        $total = (float) $order->total_price;
+
+        if ($isCash && (float) $cashReceived < $total) {
+            throw new InvalidArgumentException('Uang diterima kurang dari total tagihan Rp ' . number_format($total, 0, ',', '.') . '.');
+        }
+
+        if (! $isCash && ! $reference) {
+            throw new InvalidArgumentException('Nomor bukti transaksi wajib diisi untuk pembayaran non-tunai.');
+        }
+
+        try {
+            return $order->payments()->create([
+                'amount'          => $total,
+                'method'          => $method,
+                'gateway'         => Payment::GATEWAY_MANUAL,
+                'reference'       => $isCash ? null : $reference,
+                'idempotency_key' => 'kasir:' . $token,
+                'status'          => Payment::STATUS_PAID,
+                'paid_at'         => now(),
+                'meta'            => array_filter([
+                    'confirmed_by'  => $actor->id,
+                    'cash_received' => $isCash ? $cashReceived : null,
+                    'change'        => $isCash ? $cashReceived - $total : null,
+                ], fn ($value) => $value !== null),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            throw new InvalidArgumentException('Nomor bukti ini sudah dipakai, atau form ini sudah tersimpan. Periksa daftar pesanan.');
+        }
     }
 
     // ─────────────────────────────────────────────────────────────
     //  Helper
     // ─────────────────────────────────────────────────────────────
+
+    protected function amountOf(Checkout|Order $owner): string
+    {
+        return (string) ($owner instanceof Checkout ? $owner->total_amount : $owner->total_price);
+    }
 
     protected function assertOnlineMethod(string $method): void
     {

@@ -30,12 +30,15 @@ class CartController extends Controller
 
         $cart = $this->cartService->summary($user);
 
-        // Langkah 2 (detail & konfirmasi) hanya bisa dibuka jika ada layanan yang bisa dipesan di keranjang
+        // Langkah 2 (detail & konfirmasi) hanya memuat item yang dipilih di halaman keranjang
         $step = 'pilih';
         if ($request->query('langkah') === 'detail') {
-            if ($cart['orderable']->isEmpty()) {
-                return redirect()->route('pelanggan.pesan.index')
-                    ->with('error', 'Keranjang masih kosong. Tambahkan layanan terlebih dahulu.');
+            $selected = array_values(array_unique(array_map('intval', (array) $request->query('cart_items', []))));
+            $cart = $this->cartService->summary($user, $selected);
+
+            if ($selected === [] || $cart['orderable']->count() !== count($selected)) {
+                return redirect()->route('pelanggan.cart.index')
+                    ->with('error', 'Pilih layanan yang masih tersedia di keranjang terlebih dahulu.');
             }
             $step = 'detail';
         }
@@ -54,7 +57,7 @@ class CartController extends Controller
     }
 
     /**
-     * Halaman keranjang tersendiri (ikon keranjang di header). Isi & aksinya sama dengan keranjang sebelumnya.
+     * Halaman keranjang: pelanggan memilih item mana yang dibayar sekarang, sisanya tetap tersimpan.
      */
     public function cart(Request $request)
     {
@@ -68,7 +71,8 @@ class CartController extends Controller
     {
         $added = $this->cartService->addMany($request->user(), $request->validated('items'));
 
-        return redirect()->route('pelanggan.pesan.index')
+        // Tombol "Lanjutkan" langsung ke keranjang; ikon keranjang tetap di halaman Pesan untuk memilih lagi
+        return redirect()->route($request->boolean('lanjut') ? 'pelanggan.cart.index' : 'pelanggan.pesan.index')
             ->with('success', $added->count() . ' layanan berhasil ditambahkan ke keranjang.')
             ->with('cart_highlight', $added->pluck('id')->all());
     }

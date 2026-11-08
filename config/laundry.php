@@ -23,6 +23,9 @@ return [
     'whatsapp'   => env('LAUNDRY_WHATSAPP', '[ISI NOMOR WHATSAPP]'), // format nomor: misal 628123456789
     'email'      => env('LAUNDRY_EMAIL', '[ISI EMAIL TOKO]'),
 
+    // Zona waktu outlet: batas hari di laporan keuangan (aplikasi menyimpan waktu dalam UTC).
+    'report_timezone' => env('LAUNDRY_REPORT_TIMEZONE', 'Asia/Jakarta'),
+
     // Metode pembayaran online (cashless) yang ditampilkan ke pelanggan.
     // key = nilai kolom payments.method, label = teks yang tampil di website.
     'online_payment_methods' => [

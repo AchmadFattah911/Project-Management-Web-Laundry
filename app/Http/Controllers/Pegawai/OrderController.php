@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pegawai;
 
+use App\Exceptions\IdempotencyException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
@@ -9,10 +10,10 @@ use App\Models\OrderProcess;
 use App\Models\Service;
 use App\Models\User;
 use App\Services\OrderService;
-use App\Services\PaymentService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 
 class OrderController extends Controller
 {
@@ -27,7 +28,9 @@ class OrderController extends Controller
         $search = $request->input('search', '');
         $status = $request->input('status', '');
 
+        // Hanya pesanan yang sudah dibayar: yang belum dibayar belum menjadi pesanan
         $query = Order::with(['user', 'service', 'payments', 'checkout.payments', 'orderProcesses'])
+            ->paymentStatus('paid')
             ->when($search, fn($q) => $q->where(function ($q2) use ($search) {
                 $q2->where('order_code', 'like', "%{$search}%")
                    ->orWhere('customer_name', 'like', "%{$search}%")
@@ -51,46 +54,47 @@ class OrderController extends Controller
     public function store(StoreOrderRequest $request)
     {
         try {
-            $order = $this->orderService->create($request->validated());
-
-            // Jika ada metode bayar cash/transfer langsung dicatat di kasir
-            if ($request->filled('payment_method')) {
-                app(PaymentService::class)->recordWalkIn(
-                    $order,
-                    $request->input('payment_method'),
-                    $request->boolean('is_paid'),
-                    $request->user(),
-                );
-            }
-
-            return back()->with('success', "Pesanan walk-in berhasil dibuat dengan kode {$order->order_code}.");
-        } catch (\Exception $e) {
-            return back()->with('error', $e->getMessage())->withInput();
+            $result = $this->orderService->createWalkIn($request->validated(), $request->user());
+        } catch (InvalidArgumentException|IdempotencyException $e) {
+            return back()->with('error', $e->getMessage())->withInput($request->except('submission_token'));
         }
+
+        return back()->with('success', $this->walkInMessage($result));
     }
 
     /**
-     * Pegawai mengubah jumlah mesin atau status pesanan
+     * @param  array{response: array<string, mixed>, replayed: bool}  $result
+     */
+    protected function walkInMessage(array $result): string
+    {
+        $code = $result['response']['order_code'];
+
+        if ($result['replayed']) {
+            return "Pesanan {$code} sudah tersimpan, tidak dibuat ulang.";
+        }
+
+        $change = (float) ($result['response']['change'] ?? 0);
+
+        return "Pesanan walk-in berhasil dibuat dengan kode {$code}."
+            . ($change > 0 ? ' Kembalian Rp ' . number_format($change, 0, ',', '.') . '.' : '');
+    }
+
+    /**
+     * Pegawai hanya mengubah status pesanan. Jumlah mesin, nominal, dan status pembayaran
+     * terkunci karena pesanan yang tampil di sini sudah dibayar lunas.
      */
     public function update(Request $request, Order $order)
     {
         $this->authorize('update', $order);
 
         $validated = $request->validate([
-            'machine_qty' => 'nullable|integer|min:1|max:20',
-            'status'      => ['nullable', 'string', Rule::in(Order::STATUSES)],
+            'status' => ['required', 'string', Rule::in(Order::STATUSES)],
         ]);
 
         try {
-            if (isset($validated['machine_qty']) && $validated['machine_qty'] != $order->machine_qty) {
-                $this->orderService->updateMachineQty($order, (int) $validated['machine_qty'], auth()->user());
-            }
+            $this->orderService->updateStatus($order, $validated['status'], auth()->user());
 
-            if (isset($validated['status']) && $validated['status'] != $order->status) {
-                $this->orderService->updateStatus($order, $validated['status'], auth()->user());
-            }
-
-            return back()->with('success', 'Data pesanan berhasil diperbarui.');
+            return back()->with('success', 'Status pesanan berhasil diperbarui.');
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -113,25 +117,5 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
-    }
-
-    /**
-     * Pegawai mengonfirmasi pelunasan pembayaran
-     */
-    public function confirmPayment(Request $request, Order $order)
-    {
-        $this->authorize('update', $order);
-
-        $validated = $request->validate([
-            'method' => 'required|in:cash,transfer,e-wallet',
-        ]);
-
-        if ($order->isPaid()) {
-            return back()->with('error', 'Pesanan ini sudah lunas sebelumnya.');
-        }
-
-        app(PaymentService::class)->confirmManually($order, $validated['method'], $request->user());
-
-        return back()->with('success', 'Pembayaran pesanan berhasil dikonfirmasi lunas.');
     }
 }
