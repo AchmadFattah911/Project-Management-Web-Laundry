@@ -51,6 +51,9 @@ class CheckoutController extends Controller
 
         // Sudah lunas: tidak ada lagi yang perlu dibayar, langsung ke halaman setelah pembayaran
         if ($checkout->isPaid()) {
+            // Teruskan pesan dari request sebelumnya (mis. submit ulang checkout) agar tidak hilang di pengalihan ini
+            session()->reflash();
+
             return redirect()->route('pelanggan.pembayaran.selesai', $checkout);
         }
 

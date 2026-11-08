@@ -146,6 +146,21 @@ class CheckoutPricingIdempotencyTest extends TestCase
         $this->assertSame(64, strlen($record->request_hash));
     }
 
+    public function test_pesan_submit_ulang_tetap_tampil_jika_transaksi_sudah_lunas(): void
+    {
+        $this->fillCart();
+        $detail = $this->detail();
+        $this->checkout($detail);
+        $checkout = Checkout::sole();
+        $checkout->update(['status' => Checkout::STATUS_PAID]);
+
+        // checkout → halaman pembayaran → (sudah lunas) halaman selesai: pesannya ikut diteruskan
+        $this->followingRedirects()->post(route('pelanggan.checkout.store'), $detail)
+            ->assertOk()
+            ->assertSee('sudah dibuat sebelumnya')
+            ->assertSee($checkout->code);
+    }
+
     public function test_token_sama_isi_berbeda_diarahkan_ke_transaksi_lama_tanpa_mengubahnya(): void
     {
         $this->fillCart();
