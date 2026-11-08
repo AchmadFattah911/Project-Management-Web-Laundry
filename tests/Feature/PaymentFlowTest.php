@@ -11,6 +11,7 @@ use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\Concerns\CreatesLaundryData;
+use Tests\Concerns\UsesDummyPayments;
 use Tests\TestCase;
 
 /**
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class PaymentFlowTest extends TestCase
 {
-    use RefreshDatabase, CreatesLaundryData;
+    use RefreshDatabase, CreatesLaundryData, UsesDummyPayments;
 
     private User $pelanggan;
 

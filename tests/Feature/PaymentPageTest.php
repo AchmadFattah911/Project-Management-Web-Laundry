@@ -9,6 +9,7 @@ use App\Payments\Gateways\DummyGateway;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Concerns\CreatesLaundryData;
+use Tests\Concerns\UsesDummyPayments;
 use Tests\TestCase;
 
 /**
@@ -16,7 +17,7 @@ use Tests\TestCase;
  */
 class PaymentPageTest extends TestCase
 {
-    use RefreshDatabase, CreatesLaundryData;
+    use RefreshDatabase, CreatesLaundryData, UsesDummyPayments;
 
     private User $pelanggan;
 

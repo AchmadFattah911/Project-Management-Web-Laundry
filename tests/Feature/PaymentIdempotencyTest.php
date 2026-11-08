@@ -16,6 +16,7 @@ use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Concerns\CreatesLaundryData;
+use Tests\Concerns\UsesDummyPayments;
 use Tests\TestCase;
 
 /**
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class PaymentIdempotencyTest extends TestCase
 {
-    use RefreshDatabase, CreatesLaundryData;
+    use RefreshDatabase, CreatesLaundryData, UsesDummyPayments;
 
     private User $pelanggan;
 
@@ -366,6 +367,21 @@ class PaymentIdempotencyTest extends TestCase
         $this->assertSame(Checkout::STATUS_PAID, $this->checkout->status);
         $this->assertTrue($this->checkout->orders->every->isPaid());
         $this->assertSame(Payment::sole()->id, $this->checkout->orders->first()->paymentForDisplay()->id);
+    }
+
+    public function test_notifikasi_lunas_untuk_transaksi_yang_sudah_dibatalkan_ditandai_bukan_error(): void
+    {
+        // Alur dummy (flag mati): tagihan dibuat, transaksi dibatalkan pelanggan, lalu notifikasi lunas datang
+        $this->pay();
+        $payment = Payment::sole();
+        $this->actingAs($this->pelanggan)->post(route('pelanggan.pembayaran.cancel', $this->checkout))->assertSessionHas('status');
+
+        $this->webhook($payment->fresh(), 'paid')->assertOk();
+
+        $this->assertSame(Checkout::STATUS_CANCELLED, $this->checkout->fresh()->status);
+        $this->assertSame(Payment::FLAG_PAID_AFTER_CLOSED, $payment->fresh()->review_flag);
+        $this->assertTrue($payment->fresh()->needsRefund());
+        $this->assertNotSame(Payment::STATUS_PAID, $payment->fresh()->status);
     }
 
     public function test_notifikasi_dengan_event_sama_hanya_diterapkan_sekali(): void

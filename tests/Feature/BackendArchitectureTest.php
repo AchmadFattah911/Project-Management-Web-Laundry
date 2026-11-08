@@ -10,11 +10,12 @@ use App\Models\User;
 use App\Services\OrderService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Concerns\UsesDummyPayments;
 use Tests\TestCase;
 
 class BackendArchitectureTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, UsesDummyPayments;
 
     /**
      * 1. Harga & total dihitung server (abaikan input harga dari request/user).

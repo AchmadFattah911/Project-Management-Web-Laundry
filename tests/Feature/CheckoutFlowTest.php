@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Concerns\CreatesLaundryData;
+use Tests\Concerns\UsesDummyPayments;
 use Tests\TestCase;
 
 /**
@@ -16,7 +17,7 @@ use Tests\TestCase;
  */
 class CheckoutFlowTest extends TestCase
 {
-    use RefreshDatabase, CreatesLaundryData;
+    use RefreshDatabase, CreatesLaundryData, UsesDummyPayments;
 
     private User $pelanggan;
 
