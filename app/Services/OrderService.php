@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\OrderProcess;
 use App\Models\Service;
 use App\Models\User;
+use App\Support\Rupiah;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -33,7 +34,8 @@ class OrderService
             }
 
             $machineQty = max(1, (int) ($data['machine_qty'] ?? 1));
-            $unitPrice = (float) $service->price;
+            // Integer rupiah dari tarif di server, tidak pernah dari input
+            $unitPrice = Rupiah::parse($service->price);
             $totalPrice = $unitPrice * $machineQty;
 
             // Generate order_code unik: format LC-XXXXXX
@@ -50,6 +52,8 @@ class OrderService
                 'checkout_id'    => $data['checkout_id'] ?? null,
                 'user_id'        => $userId,
                 'service_id'     => $service->id,
+                // Snapshot: perubahan nama/harga layanan nanti tidak mengubah pesanan ini
+                'service_name_snapshot' => $service->name,
                 'customer_name'  => $customerName,
                 'customer_phone' => $customerPhone,
                 'machine_qty'    => $machineQty,
@@ -159,7 +163,7 @@ class OrderService
         }
 
         return DB::transaction(function () use ($order, $newQty) {
-            $totalPrice = (float) $order->unit_price * $newQty;
+            $totalPrice = Rupiah::parse($order->unit_price) * $newQty;
 
             $order->update([
                 'machine_qty' => $newQty,

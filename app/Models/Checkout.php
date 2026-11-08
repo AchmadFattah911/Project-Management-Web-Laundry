@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Rupiah;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -15,11 +16,17 @@ class Checkout extends Model
     public const STATUS_FAILED = 'gagal';
     public const STATUS_EXPIRED = 'kadaluarsa';
 
+    /** Alasan transaksi masih/berhenti menunggu pembayaran, ditampilkan ke pelanggan. */
+    public const PENDING_REASONS = ['menunggu_transfer', 'popup_ditutup', 'ditolak', 'kedaluwarsa'];
+
     protected $fillable = [
         'code',
         'user_id',
         'total_amount',
         'status',
+        'payment_deadline',
+        'paid_at',
+        'pending_reason',
         'contact_phone',
         'drop_off_date',
         'notes',
@@ -27,8 +34,10 @@ class Checkout extends Model
     ];
 
     protected $casts = [
-        'total_amount'  => 'decimal:2',
-        'drop_off_date' => 'date',
+        'total_amount'     => 'decimal:2',
+        'drop_off_date'    => 'date',
+        'payment_deadline' => 'datetime',
+        'paid_at'          => 'datetime',
     ];
 
     public function getRouteKeyName(): string
@@ -49,6 +58,14 @@ class Checkout extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Total tagihan dalam integer rupiah (nilai ini yang dikirim ke gateway sebagai gross_amount).
+     */
+    public function totalRupiah(): int
+    {
+        return Rupiah::parse($this->total_amount);
     }
 
     public function isPaid(): bool

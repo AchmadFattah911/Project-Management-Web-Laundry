@@ -4,23 +4,33 @@ namespace App\Services;
 
 use App\Models\CartItem;
 use App\Models\Checkout;
+use App\Models\IdempotencyKey;
 use App\Models\User;
+use App\Support\Rupiah;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Mengubah item keranjang yang dipilih menjadi 1 transaksi (checkout) berisi beberapa order (1 order per layanan).
  *
- * - Semua dalam 1 transaksi DB: checkout, order, dan pengosongan keranjang sukses bersama atau gagal bersama.
+ * - Semua dalam 1 transaksi DB: checkout, order, catatan idempotency, dan pengosongan keranjang
+ *   sukses bersama atau gagal bersama.
  * - Hanya item yang dipilih pelanggan yang dipesan; sisanya tetap di keranjang.
  * - No. HP diambil dari akun. Input hanya dipakai sekali untuk akun yang belum punya nomor.
- * - Harga dihitung ulang dari tarif layanan saat ini (lewat OrderService), tidak dari input.
- * - submission_token membuat klik "Buat Pesanan" ganda tetap menghasilkan 1 checkout.
+ * - Harga dihitung ulang dari tarif layanan saat ini (lewat OrderService) dalam integer rupiah, tidak dari input.
+ * - Idempotent per submission_token (UUID dari form):
+ *     • request ganda untuk pelanggan yang sama antre di lock baris user, lalu melihat transaksi yang sudah dibuat;
+ *     • token sama + isi sama → transaksi yang sama (replayed);
+ *     • token sama + isi beda → transaksi yang sama, perubahan diabaikan (mismatch);
+ *     • token milik pelanggan lain → ditolak.
  */
 class CheckoutService
 {
+    public const IDEMPOTENCY_SCOPE = 'checkout';
+
     public function __construct(
         protected OrderService $orderService
     ) {}
@@ -30,17 +40,20 @@ class CheckoutService
      *
      * @throws ValidationException
      */
-    public function createFromCart(User $user, array $detail): Checkout
+    public function createFromCart(User $user, array $detail): CheckoutResult
     {
         $token = $detail['submission_token'];
 
         try {
             return DB::transaction(function () use ($user, $detail, $token) {
                 // Antrean per pelanggan: request ganda menunggu di sini lalu melihat checkout yang sudah dibuat
-                User::whereKey($user->id)->lockForUpdate()->first();
+                $lockedUser = User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+
+                $phone = $lockedUser->phone ?: ($detail['contact_phone'] ?? null);
+                $hash = $this->requestHash($lockedUser, $detail, $phone);
 
                 if ($existing = $this->findBySubmissionToken($user, $token)) {
-                    return $existing;
+                    return $this->replay($existing, $token, $hash);
                 }
 
                 $selected = array_unique(array_map('intval', $detail['cart_items']));
@@ -60,10 +73,8 @@ class CheckoutService
                     ]);
                 }
 
-                $phone = $user->phone ?: $detail['contact_phone'];
-
-                if (! $user->phone) {
-                    $user->update(['phone' => $phone]);
+                if (! $lockedUser->phone) {
+                    $lockedUser->update(['phone' => $phone]);
                 }
 
                 $checkout = Checkout::create([
@@ -71,14 +82,17 @@ class CheckoutService
                     'user_id'          => $user->id,
                     'total_amount'     => 0,
                     'status'           => Checkout::STATUS_AWAITING,
+                    'payment_deadline' => now()->addMinutes((int) config('payment.expiry_minutes', 60)),
                     'contact_phone'    => $phone,
                     'drop_off_date'    => $detail['drop_off_date'],
                     'notes'            => $detail['notes'] ?? null,
                     'submission_token' => $token,
                 ]);
 
+                $total = 0;
+
                 foreach ($orderable as $item) {
-                    $this->orderService->create([
+                    $order = $this->orderService->create([
                         'checkout_id'    => $checkout->id,
                         'user_id'        => $user->id,
                         'service_id'     => $item->service_id,
@@ -88,23 +102,59 @@ class CheckoutService
                         'customer_name'  => $user->name,
                         'customer_phone' => $phone,
                     ]);
+
+                    $total += Rupiah::parse($order->total_price);
                 }
 
-                $checkout->update(['total_amount' => $checkout->orders()->sum('total_price')]);
+                $checkout->update(['total_amount' => Rupiah::toDecimal($total)]);
 
                 // Hanya item yang ikut dipesan yang dihapus; item lain tetap menunggu di keranjang
                 CartItem::whereKey($orderable->modelKeys())->delete();
 
-                return $checkout;
+                // Dicatat di transaksi yang sama: tidak mungkin ada checkout tanpa catatan hash-nya
+                IdempotencyKey::create([
+                    'key'          => $this->idempotencyKey($token),
+                    'user_id'      => $user->id,
+                    'scope'        => self::IDEMPOTENCY_SCOPE,
+                    'request_hash' => $hash,
+                    'status'       => IdempotencyKey::STATUS_COMPLETED,
+                    'response'     => ['checkout_code' => $checkout->code],
+                ]);
+
+                Log::info('checkout.created', [
+                    'checkout_code'   => $checkout->code,
+                    'idempotency_key' => $token,
+                    'user_id'         => $user->id,
+                    'total'           => $total,
+                    'orders'          => $orderable->count(),
+                ]);
+
+                return new CheckoutResult($checkout, CheckoutResult::CREATED);
             });
         } catch (UniqueConstraintViolationException $e) {
             // Pengaman terakhir jika token yang sama lolos bersamaan: pakai checkout yang sudah tersimpan
             if ($existing = $this->findBySubmissionToken($user, $token)) {
-                return $existing;
+                return new CheckoutResult($existing, CheckoutResult::REPLAYED);
             }
 
             throw $e;
         }
+    }
+
+    protected function replay(Checkout $existing, string $token, string $hash): CheckoutResult
+    {
+        $record = IdempotencyKey::where('key', $this->idempotencyKey($token))->first();
+
+        // Tanpa catatan (transaksi lama / sudah di-prune) dianggap request yang sama
+        $sameRequest = $record === null || hash_equals($record->request_hash, $hash);
+
+        Log::log($sameRequest ? 'info' : 'warning', $sameRequest ? 'checkout.replayed' : 'checkout.idempotency_mismatch', [
+            'checkout_code'   => $existing->code,
+            'idempotency_key' => $token,
+            'user_id'         => $existing->user_id,
+        ]);
+
+        return new CheckoutResult($existing, $sameRequest ? CheckoutResult::REPLAYED : CheckoutResult::MISMATCH);
     }
 
     protected function findBySubmissionToken(User $user, string $token): ?Checkout
@@ -118,6 +168,32 @@ class CheckoutService
         }
 
         return $checkout;
+    }
+
+    /**
+     * SHA256(user_id + isi form yang dinormalisasi). Yang dihitung hanya field yang menentukan pesanan;
+     * no. HP memakai nilai akhir (akun atau input pertama), sehingga kirim ulang setelah nomor
+     * tersimpan ke akun tetap dianggap request yang sama.
+     */
+    protected function requestHash(User $user, array $detail, ?string $phone): string
+    {
+        $items = array_values(array_unique(array_map('intval', $detail['cart_items'])));
+        sort($items);
+
+        $notes = trim((string) ($detail['notes'] ?? ''));
+
+        return hash('sha256', json_encode([
+            'user_id'       => (int) $user->id,
+            'cart_items'    => $items,
+            'drop_off_date' => (string) $detail['drop_off_date'],
+            'notes'         => $notes === '' ? null : $notes,
+            'contact_phone' => $phone,
+        ]));
+    }
+
+    protected function idempotencyKey(string $token): string
+    {
+        return self::IDEMPOTENCY_SCOPE . ':' . $token;
     }
 
     protected function generateCode(): string

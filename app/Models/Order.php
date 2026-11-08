@@ -13,6 +13,7 @@ class Order extends Model
         'checkout_id',
         'user_id',
         'service_id',
+        'service_name_snapshot',
         'customer_name',
         'customer_phone',
         'machine_qty',
@@ -97,6 +98,14 @@ class Order extends Model
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * Nama layanan saat order dibuat. Order lama (sebelum ada snapshot) memakai nama layanan saat ini.
+     */
+    public function serviceName(): string
+    {
+        return $this->service_name_snapshot ?? $this->service?->name ?? '-';
     }
 
     public function orderProcesses()

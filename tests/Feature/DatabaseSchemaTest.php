@@ -39,6 +39,19 @@ class DatabaseSchemaTest extends TestCase
         $this->assertTrue(Schema::hasColumns('payment_events', ['gateway', 'event_id', 'payment_id', 'status', 'payload']));
     }
 
+    public function test_kolom_aditif_pembayaran_nullable(): void
+    {
+        $nullable = fn (string $table, string $column) => DB::selectOne("SHOW COLUMNS FROM {$table} WHERE Field = ?", [$column])->Null === 'YES';
+
+        foreach (['payment_deadline', 'paid_at', 'pending_reason'] as $column) {
+            $this->assertTrue($nullable('checkouts', $column), "checkouts.{$column} harus nullable");
+        }
+        $this->assertTrue($nullable('orders', 'service_name_snapshot'));
+
+        $indexes = collect(Schema::getIndexes('checkouts'))->map(fn ($i) => implode(',', $i['columns']));
+        $this->assertContains('status,payment_deadline', $indexes);
+    }
+
     public function test_kunci_unik_penjaga_idempotency_ada_di_database(): void
     {
         $unique = fn (string $table) => collect(Schema::getIndexes($table))

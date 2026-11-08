@@ -144,7 +144,7 @@ class PaymentIdempotencyTest extends TestCase
         $this->assertNull($payment->order_id);
         $this->assertEquals(115000, (float) $payment->amount);
 
-        $record = IdempotencyKey::sole();
+        $record = IdempotencyKey::where('scope', 'checkout-payment')->sole();
         $this->assertSame(IdempotencyKey::STATUS_COMPLETED, $record->status);
         $this->assertSame($payment->id, $record->payment_id);
     }
@@ -260,7 +260,7 @@ class PaymentIdempotencyTest extends TestCase
         $this->pay()->assertRedirect();
 
         $this->assertSame(1, Payment::count());
-        $this->assertSame(IdempotencyKey::STATUS_COMPLETED, IdempotencyKey::sole()->status);
+        $this->assertSame(IdempotencyKey::STATUS_COMPLETED, IdempotencyKey::where('scope', 'checkout-payment')->sole()->status);
     }
 
     // ── Gateway error: retry aman, pelanggan tidak ditagih dobel ─────
@@ -275,7 +275,7 @@ class PaymentIdempotencyTest extends TestCase
         $payment = Payment::sole();
         $this->assertSame('failed', $payment->status);
         $this->assertNull($payment->reference);
-        $this->assertSame(IdempotencyKey::STATUS_FAILED, IdempotencyKey::sole()->status);
+        $this->assertSame(IdempotencyKey::STATUS_FAILED, IdempotencyKey::where('scope', 'checkout-payment')->sole()->status);
 
         $this->gateway->fail = false;
         $this->pay()->assertRedirect();

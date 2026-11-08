@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCheckoutRequest;
 use App\Models\Checkout;
 use App\Models\Order;
+use App\Services\CheckoutResult;
 use App\Services\CheckoutService;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -31,10 +32,17 @@ class CheckoutController extends Controller
 
     public function store(StoreCheckoutRequest $request)
     {
-        $checkout = $this->checkoutService->createFromCart($request->user(), $request->validated());
+        $result = $this->checkoutService->createFromCart($request->user(), $request->validated());
+        $code = $result->checkout->code;
 
-        return redirect()->route('pelanggan.pembayaran.show', $checkout)
-            ->with('success', "Pesanan {$checkout->code} berhasil dibuat. Silakan selesaikan pembayaran.");
+        // Submit ganda tidak pernah jadi halaman error: selalu ke transaksi yang sudah ada + penjelasan
+        [$type, $message] = match ($result->outcome) {
+            CheckoutResult::CREATED  => ['success', "Pesanan {$code} berhasil dibuat. Silakan selesaikan pembayaran."],
+            CheckoutResult::REPLAYED => ['status', "Pesanan {$code} sudah dibuat sebelumnya. Ini transaksi yang sama, tidak ada pesanan ganda."],
+            CheckoutResult::MISMATCH => ['error', "Form ini sudah dipakai untuk pesanan {$code}, jadi perubahan terakhir tidak disimpan. Untuk pesanan dengan isi berbeda, buat pesanan baru dari keranjang."],
+        };
+
+        return redirect()->route('pelanggan.pembayaran.show', $result->checkout)->with($type, $message);
     }
 
     public function show(Checkout $checkout)
