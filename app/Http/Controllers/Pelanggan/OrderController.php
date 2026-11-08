@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Pelanggan;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Service;
+use App\Services\CustomerOrderHistory;
 use App\Services\PaymentService;
+use App\Support\TransactionTimeline;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,21 +20,16 @@ class OrderController extends Controller
         protected PaymentService $paymentService,
     ) {}
 
-    public function index(Request $request)
+    public function index(Request $request, CustomerOrderHistory $history)
     {
-        // Filter tab yang sama dengan halaman Akun (semua / diproses / selesai)
-        $tab = array_key_exists($request->query('status'), Order::STATUS_GROUPS)
-            ? $request->query('status')
-            : 'semua';
+        // Tab yang sama dengan halaman Akun; 1 kartu = 1 transaksi (walk-in lama = kartu sendiri)
+        $tab = CustomerOrderHistory::normalizeTab($request->query('status'));
 
-        $orders = Order::with(['service', 'payments', 'checkout.payments', 'orderProcesses'])
-            ->where('user_id', auth()->id())
-            ->statusGroup($tab)
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
-
-        return view('pelanggan.orders.index', compact('orders', 'tab'));
+        return view('pelanggan.orders.index', [
+            'cards'  => $history->paginate($request->user(), $tab, 10),
+            'counts' => $history->counts($request->user()),
+            'tab'    => $tab,
+        ]);
     }
 
     /**
@@ -59,10 +56,11 @@ class OrderController extends Controller
     {
         $this->authorize('view', $order);
 
-        $order->load(['service', 'payments', 'checkout.payments', 'orderProcesses.pegawai']);
+        $order->load(['service', 'payments', 'checkout.payments', 'orderProcesses.pegawai', 'statusLogs']);
 
         return view('pelanggan.orders.show', [
             'order'          => $order,
+            'timeline'       => TransactionTimeline::for($order),
             'payment'        => $order->paymentForDisplay(),
             'isPaid'         => $order->isPaid(),
             'paymentMethods' => config('laundry.online_payment_methods', []),

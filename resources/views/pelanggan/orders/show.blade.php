@@ -224,6 +224,9 @@
         </div>
     @endif
 
+    <!-- Riwayat status dari order_status_logs -->
+    @include('pelanggan.partials.timeline', ['timeline' => $timeline])
+
     <!-- Catatan & Informasi Tambahan -->
     <x-card title="Informasi Pesanan" subtitle="Rincian tambahan dan instruksi pelanggan">
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 text-xs">

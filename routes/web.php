@@ -16,6 +16,7 @@ use App\Http\Controllers\Pelanggan\AccountController as PelangganAccountControll
 use App\Http\Controllers\Pelanggan\CartController as PelangganCartController;
 use App\Http\Controllers\Pelanggan\CheckoutController as PelangganCheckoutController;
 use App\Http\Controllers\Pelanggan\OrderController as PelangganOrderController;
+use App\Http\Controllers\Pelanggan\TransactionController as PelangganTransactionController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -138,6 +139,8 @@ Route::middleware(['auth', 'verified', 'role:pelanggan'])
         Route::get('/orders', [PelangganOrderController::class, 'index'])->name('orders.index');
         Route::get('/pesan/{service:slug}', [PelangganOrderController::class, 'start'])->name('orders.start');
         Route::get('/orders/{order}', [PelangganOrderController::class, 'show'])->name('orders.show');
+        // Detail transaksi keranjang + timeline (milik orang lain → 404)
+        Route::get('/transaksi/{checkout:code}', [PelangganTransactionController::class, 'show'])->name('transaksi.show');
         Route::post('/orders/{order}/pay', [PelangganOrderController::class, 'pay'])->name('orders.pay');
     });
 

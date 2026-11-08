@@ -1,16 +1,13 @@
 @props([
     'active' => 'semua',
     'route',            // nama route tujuan tab (mis. pelanggan.akun / pelanggan.orders.index)
-    'counts' => [],     // opsional: jumlah pesanan per tab
+    'counts' => [],     // opsional: jumlah kartu transaksi per tab
     'fragment' => '',   // opsional: anchor agar halaman tetap di posisi riwayat setelah pindah tab
 ])
 
 @php
-    $tabs = [
-        'semua'    => 'Semua',
-        'diproses' => 'Di proses',
-        'selesai'  => 'Selesai',
-    ];
+    // Belum Bayar / Diproses / Selesai / Dibatalkan (Dibatalkan mencakup kedaluwarsa & gagal), lihat CustomerOrderHistory
+    $tabs = \App\Services\CustomerOrderHistory::TABS;
 @endphp
 
 <nav {{ $attributes->merge(['class' => 'flex gap-2 overflow-x-auto -mx-1 px-1 pb-1']) }} aria-label="Filter status pesanan">

@@ -78,7 +78,8 @@ class AccountPageTest extends TestCase
 
         $this->assertTrue($name !== false && $pencil > $name && $avatar > $pencil, 'Urutan harus: nama, pensil, foto profil paling kanan.');
         $this->assertStringContainsString('BS', substr($profile, $avatar));
-        $this->assertMatchesRegularExpression('/bg-amber-400[^>]*>3</', $header, 'Badge notifikasi = jumlah pesanan Di proses (termasuk siap diambil).');
+        // Tahap 6: pesanan 'pending' yang belum dibayar pindah ke tab Belum Bayar → yang berjalan: diproses + siap diambil
+        $this->assertMatchesRegularExpression('/bg-amber-400[^>]*>2</', $header, 'Badge notifikasi = jumlah pesanan Diproses (termasuk siap diambil).');
 
         foreach (['saldo', 'token', 'kupon', 'koin'] as $word) {
             $this->assertStringNotContainsStringIgnoringCase($word, strip_tags($header));
@@ -94,7 +95,7 @@ class AccountPageTest extends TestCase
         }
     }
 
-    public function test_riwayat_pemesanan_dengan_tiga_tab_status(): void
+    public function test_riwayat_pemesanan_dengan_tab_status(): void
     {
         $riwayat = $this->section($this->actingAs($this->budi)->get('/akun')->getContent(), 'id="riwayat"');
 
@@ -102,9 +103,9 @@ class AccountPageTest extends TestCase
         $this->assertGreaterThan(strpos($riwayat, 'Riwayat Pemesanan'), strpos($riwayat, 'Lihat Semua'));
 
         preg_match_all('/rounded-full text-xs font-bold border[^>]*>\s*<span>([^<]+)<\/span>\s*<span[^>]*>(\d+)</', $riwayat, $tabs);
-        $this->assertSame(['Semua', 'Di proses', 'Selesai'], $tabs[1]);
-        // Tidak ada pesanan yang terhitung di dua tab sekaligus: 3 + 1 = 4
-        $this->assertSame(['4', '3', '1'], $tabs[2]);
+        $this->assertSame(['Semua', 'Belum Bayar', 'Diproses', 'Selesai', 'Dibatalkan'], $tabs[1]);
+        // Tidak ada pesanan yang terhitung di dua tab sekaligus: 1 + 2 + 1 + 0 = 4
+        $this->assertSame(['4', '1', '2', '1', '0'], $tabs[2]);
         $this->assertMatchesRegularExpression('/aria-current="page"[^>]*>\s*<span>Semua</', $riwayat);
 
         foreach ($this->codes as $code) {
@@ -117,11 +118,16 @@ class AccountPageTest extends TestCase
     public function test_tab_di_proses_dan_selesai_memfilter_dengan_benar(): void
     {
         $diproses = $this->section($this->actingAs($this->budi)->get('/akun?status=diproses')->getContent(), 'id="riwayat"');
-        $this->assertStringContainsString($this->codes['pending'], $diproses);
+        // Pesanan 'pending' yang belum dibayar ada di tab Belum Bayar (Tahap 6), bukan Diproses
+        $this->assertStringNotContainsString($this->codes['pending'], $diproses);
         $this->assertStringContainsString($this->codes['diproses'], $diproses);
         $this->assertStringContainsString($this->codes['siap_diambil'], $diproses, 'Siap diambil = belum diambil, masih di tab Di proses.');
         $this->assertStringNotContainsString($this->codes['selesai'], $diproses);
         $this->assertStringContainsString('href="' . route('pelanggan.orders.index', ['status' => 'diproses']) . '"', $diproses);
+
+        $belumBayar = $this->section($this->actingAs($this->budi)->get('/akun?status=belum_bayar')->getContent(), 'id="riwayat"');
+        $this->assertStringContainsString($this->codes['pending'], $belumBayar);
+        $this->assertStringNotContainsString($this->codes['diproses'], $belumBayar);
 
         $selesai = $this->section($this->actingAs($this->budi)->get('/akun?status=selesai')->getContent(), 'id="riwayat"');
         $this->assertStringContainsString($this->codes['selesai'], $selesai);

@@ -5,9 +5,11 @@
 @section('content')
 @php
     $tabTitles = [
-        'semua'    => 'Belum ada pesanan',
-        'diproses' => 'Tidak ada pesanan yang sedang diproses',
-        'selesai'  => 'Belum ada pesanan yang selesai',
+        'semua'       => 'Belum ada pesanan',
+        'belum_bayar' => 'Tidak ada pesanan yang menunggu pembayaran',
+        'diproses'    => 'Tidak ada pesanan yang sedang diproses',
+        'selesai'     => 'Belum ada pesanan yang selesai',
+        'dibatalkan'  => 'Tidak ada pesanan yang dibatalkan',
     ];
 @endphp
 
@@ -79,7 +81,7 @@
 
         <x-order-status-tabs :active="$tab" route="pelanggan.akun" :counts="$counts" fragment="riwayat" class="mb-3" />
 
-        @if ($orders->isEmpty())
+        @if ($cards->isEmpty())
             <div class="py-8 text-center">
                 <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
                     <x-icon name="package" class="w-6 h-6" />
@@ -92,34 +94,11 @@
                 @endif
             </div>
         @else
-            <ul class="divide-y divide-slate-100">
-                @foreach ($orders as $order)
-                    @php
-                        $payment = $order->paymentForDisplay();
-                        $payStatus = $payment?->displayStatus() ?? 'pending';
-                    @endphp
-                    <li>
-                        <a href="{{ route('pelanggan.orders.show', $order) }}" class="flex items-start gap-3 py-3 group">
-                            <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                                <x-icon name="washer" class="w-5 h-5" />
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-start justify-between gap-2">
-                                    <p class="text-sm font-bold text-slate-900 truncate group-hover:text-sky-700">{{ $order->service?->name ?? 'Layanan' }}</p>
-                                    <x-badge :status="$order->status" size="sm" />
-                                </div>
-                                <p class="text-[11px] text-slate-500 mt-0.5">
-                                    <span class="font-mono font-semibold">{{ $order->order_code }}</span> &middot; {{ $order->created_at->format('d M Y, H:i') }}
-                                </p>
-                                <div class="mt-1.5 flex items-center justify-between gap-2">
-                                    <p class="text-sm font-extrabold text-slate-900">Rp {{ number_format($order->total_price, 0, ',', '.') }}</p>
-                                    <x-badge :payment="$payStatus" size="sm" />
-                                </div>
-                            </div>
-                        </a>
-                    </li>
+            <div class="space-y-3">
+                @foreach ($cards as $card)
+                    @include('pelanggan.partials.transaction-card', ['card' => $card])
                 @endforeach
-            </ul>
+            </div>
         @endif
     </section>
 
