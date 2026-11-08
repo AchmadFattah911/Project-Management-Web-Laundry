@@ -6,9 +6,13 @@ use App\Exceptions\IdempotencyException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Service;
 use App\Models\User;
+use App\Payments\Gateways\MidtransGateway;
+use App\Services\MidtransNotificationService;
 use App\Services\OrderService;
+use App\Services\OrderStateMachine;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -122,6 +126,44 @@ class OrderController extends Controller
         }
 
         return back()->with('success', 'Pembayaran pesanan berhasil dikonfirmasi lunas.');
+    }
+
+    /**
+     * "Cek status ke Midtrans" (C4): pengganti tombol lunas manual untuk transaksi online.
+     * Memakai jalur yang sama dengan webhook (konfirmasi API status lalu state machine), tanpa input status dari admin.
+     */
+    public function checkMidtrans(Request $request, Order $order, MidtransNotificationService $midtrans)
+    {
+        if (! $order->checkout_id) {
+            return back()->with('error', 'Pesanan ini bukan transaksi online.');
+        }
+
+        $payments = Payment::where('checkout_id', $order->checkout_id)
+            ->where('gateway', MidtransGateway::NAME)
+            ->whereNotNull('snap_token')
+            ->latest('id')
+            ->take(5)
+            ->get();
+
+        if ($payments->isEmpty()) {
+            return back()->with('status', 'Belum ada tagihan Midtrans untuk transaksi ini (pelanggan belum menekan Bayar Sekarang).');
+        }
+
+        $lines = $payments->map(function (Payment $payment) use ($midtrans, $request) {
+            try {
+                $synced = $midtrans->sync($payment, OrderStateMachine::ACTOR_RECONCILE, $request->user());
+            } catch (\Throwable $e) {
+                return "{$payment->reference}: gagal dicek ({$e->getMessage()})";
+            }
+
+            $remote = $synced['status']['transaction_status'] ?? 'belum ada transaksi (metode belum dipilih)';
+
+            return "{$payment->reference}: {$remote} ({$synced['result']})";
+        });
+
+        $checkout = $order->checkout()->first();
+
+        return back()->with('success', "Status transaksi {$checkout->code}: {$checkout->status}. " . $lines->implode('; '));
     }
 
     public function updateProcess(Request $request, \App\Models\OrderProcess $process)

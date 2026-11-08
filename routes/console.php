@@ -11,3 +11,8 @@ Artisan::command('inspire', function () {
 
 // Bersihkan idempotency key pembayaran yang sudah lewat masa simpan
 Schedule::command('model:prune', ['--model' => [IdempotencyKey::class]])->daily();
+
+// Pembayaran Midtrans: jaring pengaman webhook & penutupan transaksi lewat batas bayar.
+// withoutOverlapping: putaran berikutnya dilewati jika putaran sebelumnya belum selesai.
+Schedule::command('payments:reconcile')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('checkouts:expire')->everyFiveMinutes()->withoutOverlapping(10);

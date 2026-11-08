@@ -18,6 +18,8 @@ class Payment extends Model
     public const FLAG_DUPLICATE_PAID = 'duplicate_paid_needs_refund';
     public const FLAG_PAID_AFTER_CLOSED = 'paid_after_closed';
 
+    public const REVIEW_FLAGS = [self::FLAG_AMOUNT_MISMATCH, self::FLAG_DUPLICATE_PAID, self::FLAG_PAID_AFTER_CLOSED];
+
     protected $fillable = [
         'order_id',
         'checkout_id',
@@ -32,6 +34,9 @@ class Payment extends Model
         'payment_type',
         'status',
         'review_flag',
+        'refunded_at',
+        'refunded_by',
+        'refund_note',
         'paid_at',
         'expires_at',
         'meta',
@@ -40,6 +45,7 @@ class Payment extends Model
     protected $casts = [
         'paid_at'    => 'datetime',
         'expires_at' => 'datetime',
+        'refunded_at' => 'datetime',
         'meta'       => 'array',
     ];
 
@@ -61,9 +67,32 @@ class Payment extends Model
         return $this->hasMany(PaymentEvent::class);
     }
 
+    public function refundedBy()
+    {
+        return $this->belongsTo(User::class, 'refunded_by');
+    }
+
     public function needsRefund(): bool
     {
         return (bool) ($this->meta['needs_refund'] ?? false);
+    }
+
+    /**
+     * Pembayaran yang perlu ditinjau admin (halaman Perlu Refund).
+     */
+    public function scopeFlagged($query)
+    {
+        return $query->whereIn('review_flag', self::REVIEW_FLAGS);
+    }
+
+    /**
+     * Instruksi bayar dari Midtrans (bank + nomor VA) setelah pelanggan memilih metode di Snap.
+     *
+     * @return array{bank: string, number: string, biller_code?: string}|null
+     */
+    public function paymentInstruction(): ?array
+    {
+        return $this->meta['midtrans']['instruction'] ?? null;
     }
 
     /**

@@ -307,12 +307,30 @@ class PaymentService
 
             // Uang sudah masuk lewat tagihan ini, tetapi transaksinya sudah lunas lewat tagihan lain
             if ($this->ownerPayments($payment)->where('status', Payment::STATUS_PAID)->exists()) {
-                $payment->update(['meta' => array_merge($meta, ['needs_refund' => true])]);
+                $payment->update([
+                    'review_flag' => $payment->review_flag ?? Payment::FLAG_DUPLICATE_PAID,
+                    'meta'        => array_merge($meta, ['needs_refund' => true]),
+                ]);
 
                 Log::warning('Pembayaran ganda untuk transaksi yang sudah lunas, perlu refund manual', [
                     'payment_id'  => $payment->id,
                     'checkout_id' => $payment->checkout_id,
                     'order_id'    => $payment->order_id,
+                ]);
+
+                return $payment;
+            }
+
+            // Transaksi sudah ditutup (dibatalkan/kadaluarsa/gagal): jangan dihidupkan lagi, uangnya dicatat untuk refund
+            if ($payment->checkout_id && in_array($payment->checkout()->value('status'), Checkout::CLOSED_UNPAID, true)) {
+                $payment->update([
+                    'review_flag' => $payment->review_flag ?? Payment::FLAG_PAID_AFTER_CLOSED,
+                    'meta'        => array_merge($meta, ['needs_refund' => true]),
+                ]);
+
+                Log::warning('Pembayaran masuk untuk transaksi yang sudah ditutup, perlu refund manual', [
+                    'payment_id'  => $payment->id,
+                    'checkout_id' => $payment->checkout_id,
                 ]);
 
                 return $payment;

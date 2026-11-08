@@ -57,6 +57,12 @@ class DatabaseSchemaTest extends TestCase
             $this->assertTrue($nullable('payments', $column), "payments.{$column} harus nullable");
         }
 
+        foreach (['refunded_at', 'refunded_by', 'refund_note'] as $column) {
+            $this->assertTrue($nullable('payments', $column), "payments.{$column} harus nullable");
+        }
+
+        $this->assertTrue(Schema::hasColumns('payment_notifications', ['gateway', 'order_id', 'transaction_id', 'transaction_status', 'fraud_status', 'gross_amount', 'signature_valid', 'result', 'payment_id', 'ip', 'raw_body', 'processed_at']));
+
         $pendingOwner = DB::selectOne("SHOW COLUMNS FROM payments WHERE Field = 'pending_owner'");
         $this->assertSame('VIRTUAL GENERATED', $pendingOwner->Extra);
     }

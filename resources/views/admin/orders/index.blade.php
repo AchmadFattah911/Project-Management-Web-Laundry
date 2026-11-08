@@ -581,9 +581,18 @@
                                 </template>
 
                                 <template x-if="selectedOrder.payment_status !== 'paid' && ! selectedOrder.manual_confirm">
-                                    <p class="p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs">
-                                        Pesanan online dibayar lewat Midtrans. Status lunas diperbarui otomatis dari konfirmasi Midtrans, tidak bisa ditandai lunas manual.
-                                    </p>
+                                    <div class="space-y-2">
+                                        <p class="p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs">
+                                            Pesanan online dibayar lewat Midtrans. Status lunas diperbarui otomatis dari konfirmasi Midtrans, tidak bisa ditandai lunas manual.
+                                        </p>
+                                        {{-- Jalur sama dengan webhook: status diambil dari API Midtrans, bukan dipilih admin --}}
+                                        <form :action="'/admin/orders/' + selectedOrder.id + '/cek-midtrans'" method="POST" x-data="{ sending: false }" @submit="if (sending) { $event.preventDefault(); return; } sending = true">
+                                            @csrf
+                                            <button type="submit" :disabled="sending" class="w-full px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-xs transition-colors disabled:opacity-60">
+                                                <span x-text="sending ? 'Mengecek...' : 'Cek status ke Midtrans'">Cek status ke Midtrans</span>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </template>
 
                                 <template x-if="selectedOrder.payment_status !== 'paid' && selectedOrder.manual_confirm">

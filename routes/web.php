@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\OrderController as AdminOrderController;
+use App\Http\Controllers\Admin\RefundController as AdminRefundController;
 use App\Http\Controllers\Admin\ServiceController as AdminServiceController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\DummyCheckoutController;
@@ -88,6 +89,12 @@ Route::middleware(['auth', 'verified', 'role:admin'])
         Route::delete('/orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
         Route::put('/orders/process/{process}', [AdminOrderController::class, 'updateProcess'])->name('orders.process');
         Route::post('/orders/{order}/payment', [AdminOrderController::class, 'confirmPayment'])->name('orders.payment');
+        // Transaksi online: cek status ke Midtrans (jalur sama dengan webhook), pengganti lunas manual
+        Route::post('/orders/{order}/cek-midtrans', [AdminOrderController::class, 'checkMidtrans'])->middleware('throttle:20,1,admin.check-midtrans:')->name('orders.check-midtrans');
+
+        // Pembayaran yang perlu direfund (nominal beda, bayar ganda, bayar setelah transaksi ditutup)
+        Route::get('/perlu-refund', [AdminRefundController::class, 'index'])->name('refunds.index');
+        Route::post('/perlu-refund/{payment}', [AdminRefundController::class, 'markRefunded'])->name('refunds.mark');
 
         // Layanan Laundry
         Route::get('/services', [AdminServiceController::class, 'index'])->name('services.index');

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Payments\Gateways\MidtransGateway;
 use App\Payments\InvalidPaymentNotification;
+use App\Services\MidtransNotificationService;
 use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,11 +19,19 @@ use RuntimeException;
 class PaymentWebhookController extends Controller
 {
     public function __construct(
-        protected PaymentService $paymentService
+        protected PaymentService $paymentService,
+        protected MidtransNotificationService $midtrans,
     ) {}
 
     public function __invoke(Request $request, string $gateway): JsonResponse
     {
+        // Midtrans: simpan → signature (403) → konfirmasi API status → terapkan (lihat MidtransNotificationService)
+        if ($gateway === MidtransGateway::NAME) {
+            $outcome = $this->midtrans->handleWebhook($request->getContent(), $request->ip());
+
+            return response()->json(['message' => $outcome['result']], $outcome['http']);
+        }
+
         $headers = collect($request->headers->all())
             ->mapWithKeys(fn ($values, $key) => [strtolower($key) => (string) ($values[0] ?? '')])
             ->all();

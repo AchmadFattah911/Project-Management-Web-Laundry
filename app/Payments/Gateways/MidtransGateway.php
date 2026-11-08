@@ -6,6 +6,7 @@ use App\Contracts\PaymentGateway;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Payments\InvalidPaymentNotification;
+use App\Payments\InvalidPaymentSignature;
 use App\Payments\PaymentCharge;
 use App\Payments\PaymentNotification;
 use App\Support\Rupiah;
@@ -125,10 +126,133 @@ class MidtransGateway implements PaymentGateway
         }
     }
 
+    /**
+     * Verifikasi signature lalu terjemahkan ke format standar. Isi notifikasi BUKAN sumber kebenaran:
+     * webhook Midtrans diproses MidtransNotificationService yang selalu mengonfirmasi ke API status.
+     *
+     * @throws InvalidPaymentSignature  signature salah / tidak ada
+     * @throws InvalidPaymentNotification  payload rusak
+     */
     public function parseNotification(string $rawBody, array $headers): PaymentNotification
     {
-        // Diaktifkan di Tahap 5 (verifikasi signature + konfirmasi status + dedup per transaction_id & status)
-        throw new InvalidPaymentNotification('Notifikasi Midtrans belum diproses (Tahap 5).');
+        $payload = json_decode($rawBody, true);
+
+        if (! is_array($payload) || empty($payload['order_id'])) {
+            throw new InvalidPaymentNotification('Payload notifikasi Midtrans tidak valid.');
+        }
+
+        if (! $this->verifySignature($payload)) {
+            throw new InvalidPaymentSignature('Signature notifikasi Midtrans tidak valid.');
+        }
+
+        $status = match (self::statusKind($payload)) {
+            'paid'      => Payment::STATUS_PAID,
+            'failed'    => Payment::STATUS_FAILED,
+            'expired', 'cancelled' => Payment::STATUS_EXPIRED,
+            default     => Payment::STATUS_PENDING,
+        };
+
+        try {
+            $amount = Rupiah::parse($payload['gross_amount'] ?? null);
+        } catch (\InvalidArgumentException|\TypeError) {
+            throw new InvalidPaymentNotification('gross_amount notifikasi Midtrans tidak valid.');
+        }
+
+        return new PaymentNotification(
+            reference: (string) $payload['order_id'],
+            status: $status,
+            amountInCents: $amount * 100,
+            raw: $payload,
+            eventId: self::eventId($payload),
+        );
+    }
+
+    /**
+     * signature_key = SHA512(order_id + status_code + gross_amount + server_key), gross_amount persis seperti
+     * yang dikirim (mis. "35000.00"). Dibandingkan dengan hash_equals (tahan timing attack).
+     */
+    public function verifySignature(array $payload): bool
+    {
+        $serverKey = (string) config('payment.gateways.midtrans.server_key');
+        $signature = $payload['signature_key'] ?? null;
+
+        if ($serverKey === '' || ! is_string($signature) || $signature === '') {
+            return false;
+        }
+
+        $expected = hash('sha512', (string) ($payload['order_id'] ?? '') . (string) ($payload['status_code'] ?? '') . (string) ($payload['gross_amount'] ?? '') . $serverKey);
+
+        return hash_equals($expected, strtolower($signature));
+    }
+
+    /**
+     * Kunci dedup: 1 status per transaksi Midtrans. transaction_id bisa berganti untuk order_id yang sama
+     * (pelanggan ganti metode di Snap), jadi transaction_id + status, bukan order_id.
+     * capture menyertakan fraud_status (capture:challenge lalu capture:accept adalah dua kejadian berbeda).
+     */
+    public static function eventId(array $status): string
+    {
+        $transactionStatus = (string) ($status['transaction_status'] ?? 'unknown');
+        $id = ($status['transaction_id'] ?? null) ?: ('order:' . ($status['order_id'] ?? ''));
+
+        return $id . ':' . $transactionStatus . ($transactionStatus === 'capture' ? ':' . ($status['fraud_status'] ?? 'none') : '');
+    }
+
+    /**
+     * paid | pending | failed | expired | cancelled | other (refund, chargeback, authorize, ...).
+     */
+    public static function statusKind(array $status): string
+    {
+        $fraud = $status['fraud_status'] ?? null;
+
+        return match ($status['transaction_status'] ?? null) {
+            'settlement' => 'paid',
+            // capture hanya lunas jika lolos fraud check; challenge = tunggu keputusan, tanpa fraud_status = jangan dianggap lunas
+            'capture'    => match ($fraud) {
+                'accept' => 'paid',
+                'deny'   => 'failed',
+                default  => 'pending',
+            },
+            'pending'    => 'pending',
+            'deny', 'failure' => 'failed',
+            'expire'     => 'expired',
+            'cancel'     => 'cancelled',
+            default      => 'other',
+        };
+    }
+
+    /**
+     * payment_type Midtrans → payments.method (enum cash/transfer/e-wallet). null = tidak dikenal, method tidak diubah.
+     */
+    public static function methodFor(?string $paymentType): ?string
+    {
+        return match ($paymentType) {
+            'bank_transfer', 'echannel', 'permata', 'bca_klikpay', 'bca_klikbca', 'bri_epay', 'cimb_clicks', 'danamon_online', 'other_va' => 'transfer',
+            'gopay', 'shopeepay', 'qris', 'other_qris', 'dana', 'ovo', 'linkaja' => 'e-wallet',
+            default => null,
+        };
+    }
+
+    /**
+     * Instruksi bayar yang ditampilkan ke pelanggan (bank + nomor VA / kode bayar), jika ada.
+     *
+     * @return array{bank: string, number: string, biller_code?: string}|null
+     */
+    public static function paymentInstruction(array $status): ?array
+    {
+        if (! empty($status['va_numbers'][0]['va_number'])) {
+            return ['bank' => strtoupper((string) $status['va_numbers'][0]['bank']), 'number' => (string) $status['va_numbers'][0]['va_number']];
+        }
+
+        if (! empty($status['permata_va_number'])) {
+            return ['bank' => 'PERMATA', 'number' => (string) $status['permata_va_number']];
+        }
+
+        if (! empty($status['bill_key'])) {
+            return ['bank' => 'MANDIRI', 'number' => (string) $status['bill_key'], 'biller_code' => (string) ($status['biller_code'] ?? '')];
+        }
+
+        return null;
     }
 
     public static function clientKey(): ?string
