@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CartItem;
+use App\Models\Checkout;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -36,6 +37,64 @@ class CartService
     public static function itemTypes(): array
     {
         return array_keys(config('laundry.item_types', []));
+    }
+
+    /**
+     * "Pesan Lagi" dari transaksi yang berhenti tanpa dibayar (gagal / kadaluarsa / dibatalkan).
+     * Item disalin ke keranjang (harga selalu tarif terbaru, karena keranjang tidak menyimpan harga);
+     * layanan yang sudah nonaktif / tidak bisa dipesan online dilewati dan namanya dikembalikan.
+     *
+     * @return array{added: Collection<int, CartItem>, skipped: list<string>}
+     *
+     * @throws ValidationException  transaksi tidak bisa dipesan ulang / batas keranjang terlampaui
+     */
+    public function reorderFromCheckout(User $user, Checkout $checkout): array
+    {
+        if ((int) $checkout->user_id !== (int) $user->id) {
+            throw ValidationException::withMessages(['checkout' => 'Transaksi tidak ditemukan.']);
+        }
+
+        if (! in_array($checkout->status, Checkout::CLOSED_UNPAID, true)) {
+            throw ValidationException::withMessages(['checkout' => 'Pesan Lagi hanya untuk transaksi yang gagal, kedaluwarsa, atau dibatalkan.']);
+        }
+
+        $orderable = Service::bisaDipesanOnline()->pluck('id')->flip();
+        $items = [];
+        $skipped = [];
+
+        foreach ($checkout->orders()->with('service')->orderBy('id')->get() as $order) {
+            if (! $orderable->has($order->service_id)) {
+                $skipped[] = $order->serviceName();
+
+                continue;
+            }
+
+            $items[] = [
+                'service_id' => $order->service_id,
+                'qty'        => min($order->machine_qty, self::maxQty()),
+                'item_type'  => $this->itemTypeKey($order->item_type),
+                'notes'      => $order->notes,
+            ];
+        }
+
+        $added = $items ? $this->addMany($user, $items) : collect();
+
+        return ['added' => $added, 'skipped' => array_values(array_unique($skipped))];
+    }
+
+    /**
+     * Pesanan menyimpan label jenis cucian ("Sprei / Selimut Tipis"); keranjang memakai key-nya ("sprei").
+     * Label yang tidak dikenal memakai 'campuran' (batas kapasitas paling aman).
+     */
+    protected function itemTypeKey(?string $label): string
+    {
+        foreach (config('laundry.item_types', []) as $key => $type) {
+            if ($label === $key || $label === ($type['label'] ?? null)) {
+                return $key;
+            }
+        }
+
+        return 'campuran';
     }
 
     /**

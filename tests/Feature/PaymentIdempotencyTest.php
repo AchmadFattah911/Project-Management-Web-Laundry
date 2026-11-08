@@ -351,7 +351,7 @@ class PaymentIdempotencyTest extends TestCase
 
     public function test_pelanggan_lain_tidak_bisa_membayar_transaksi_orang_lain(): void
     {
-        $this->pay(user: $this->makeUser())->assertForbidden();
+        $this->pay(user: $this->makeUser())->assertNotFound();
         $this->assertSame(0, Payment::count());
     }
 

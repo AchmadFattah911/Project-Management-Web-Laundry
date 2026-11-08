@@ -20,7 +20,8 @@ use Illuminate\Support\Facades\Log;
  *   menunggu_pembayaran → lunas       hanya dari gateway (webhook / rekonsiliasi) atau pelunasan manual admin
  *   menunggu_pembayaran → gagal       gateway
  *   menunggu_pembayaran → kadaluarsa  gateway / scheduler
- *   lunas, gagal, kadaluarsa = final
+ *   menunggu_pembayaran → dibatalkan  pelanggan / gateway (cancel)
+ *   lunas, gagal, kadaluarsa, dibatalkan = final
  *
  * Pesanan (status pengerjaan): pending → diproses → siap_diambil → selesai
  *   - hanya admin/pegawai, dan hanya setelah lunas;
@@ -47,6 +48,7 @@ class OrderStateMachine
             Checkout::STATUS_PAID    => [self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE, self::ACTOR_ADMIN],
             Checkout::STATUS_FAILED  => [self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE],
             Checkout::STATUS_EXPIRED => [self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE, self::ACTOR_SCHEDULER],
+            Checkout::STATUS_CANCELLED => [self::ACTOR_PELANGGAN, self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE],
         ],
     ];
 

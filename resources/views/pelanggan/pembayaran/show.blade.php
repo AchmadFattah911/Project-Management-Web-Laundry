@@ -89,7 +89,12 @@
             <section class="rounded-2xl border border-slate-200 bg-white shadow-xs p-5 sm:p-6" aria-labelledby="bayar-title">
                 <h2 id="bayar-title" class="text-base font-extrabold text-slate-900">Pembayaran</h2>
 
-                @if ($state === 'awaiting')
+                @if (! $checkout->isAwaitingPayment())
+                    @include('pelanggan.pembayaran.partials.closed-panel')
+                @elseif ($snap)
+                    @include('pelanggan.pembayaran.partials.snap-panel')
+                    @include('pelanggan.pembayaran.partials.cancel-form')
+                @elseif ($state === 'awaiting')
                     <div
                         x-data="paymentWatcher({
                             expiresAt: {{ $payment->expires_at ? $payment->expires_at->getTimestampMs() : 'null' }},
@@ -158,6 +163,10 @@
                             'selected'    => $payment?->method,
                         ])
                     </div>
+                @endif
+
+                @if ($checkout->isAwaitingPayment() && ! $snap)
+                    @include('pelanggan.pembayaran.partials.cancel-form')
                 @endif
             </section>
 

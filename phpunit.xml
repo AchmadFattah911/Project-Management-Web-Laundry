@@ -19,6 +19,11 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Default test = perilaku lama; test Midtrans menyalakan flag sendiri (Http::fake, tanpa jaringan) -->
+        <env name="PAYMENT_ENABLED" value="false"/>
+        <env name="MIDTRANS_IS_PRODUCTION" value="false"/>
+        <env name="MIDTRANS_SERVER_KEY" value="SB-Mid-server-TEST"/>
+        <env name="MIDTRANS_CLIENT_KEY" value="SB-Mid-client-TEST"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

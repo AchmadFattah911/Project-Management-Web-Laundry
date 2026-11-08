@@ -367,6 +367,6 @@ class CheckoutFlowTest extends TestCase
             ->assertSee('Cuci Lipat Uji')
             ->assertSee('Rp 115.000');
 
-        $this->actingAs($this->makeUser())->get(route('pelanggan.pembayaran.show', $checkout))->assertForbidden();
+        $this->actingAs($this->makeUser())->get(route('pelanggan.pembayaran.show', $checkout))->assertNotFound();
     }
 }

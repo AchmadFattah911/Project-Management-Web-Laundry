@@ -11,7 +11,16 @@ return [
     | 2. Daftarkan di 'gateways' di bawah
     | 3. Ganti PAYMENT_GATEWAY di .env
     */
-    'default' => env('PAYMENT_GATEWAY', 'dummy'),
+    'default' => env('PAYMENT_ENABLED', false) ? 'midtrans' : env('PAYMENT_GATEWAY', 'dummy'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Flag Pembayaran Midtrans
+    |--------------------------------------------------------------------------
+    | false (default) = website berperilaku seperti sebelumnya (gateway di PAYMENT_GATEWAY, mis. dummy).
+    | true            = transaksi keranjang dibayar lewat Midtrans Snap.
+    */
+    'enabled' => (bool) env('PAYMENT_ENABLED', false),
 
     // Batas waktu pembayaran sebelum tagihan dianggap kadaluarsa (menit)
     'expiry_minutes' => (int) env('PAYMENT_EXPIRY_MINUTES', 60),
@@ -30,6 +39,22 @@ return [
     ],
 
     'gateways' => [
+        'midtrans' => [
+            'class'          => App\Payments\Gateways\MidtransGateway::class,
+            // SERVER_KEY hanya di backend; CLIENT_KEY boleh tampil di halaman (snap.js)
+            'server_key'     => env('MIDTRANS_SERVER_KEY'),
+            'client_key'     => env('MIDTRANS_CLIENT_KEY'),
+            'is_production'  => (bool) env('MIDTRANS_IS_PRODUCTION', false),
+            'timeout'        => (int) env('MIDTRANS_HTTP_TIMEOUT', 15),
+            // Tagihan yang sedang dibuat (belum ada snap_token) lebih lama dari ini dianggap macet → ditutup, dibuat -P{n+1}
+            'in_flight_seconds' => (int) env('MIDTRANS_IN_FLIGHT_SECONDS', 45),
+            // Kartu kredit sengaja tidak diaktifkan (payments.method hanya transfer / e-wallet)
+            'enabled_payments' => array_values(array_filter(array_map('trim', explode(',', (string) env(
+                'MIDTRANS_ENABLED_PAYMENTS',
+                'bca_va,bni_va,bri_va,permata_va,echannel,other_va,gopay,shopeepay,qris'
+            ))))),
+        ],
+
         'dummy' => [
             'class'   => App\Payments\Gateways\DummyGateway::class,
             // Secret untuk tanda tangan (HMAC) notifikasi webhook dummy

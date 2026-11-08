@@ -191,7 +191,7 @@ class PaymentFlowTest extends TestCase
         $body = json_encode(['reference' => 'DUMMY-TIDAKADA', 'status' => 'paid', 'amount' => '1']);
         $this->sendWebhook($payment, 'paid', $this->sign($body), $body)->assertStatus(400);
 
-        $this->call('POST', route('payments.webhook', 'midtrans'), [], [], [], ['CONTENT_TYPE' => 'application/json'], '{}')
+        $this->call('POST', route('payments.webhook', 'xendit'), [], [], [], ['CONTENT_TYPE' => 'application/json'], '{}')
             ->assertNotFound();
     }
 
@@ -311,7 +311,7 @@ class PaymentFlowTest extends TestCase
         [$order] = $this->placeOrder();
 
         $this->actingAs($this->makeUser())->post(route('pelanggan.orders.pay', $order), ['payment_method' => 'transfer'])
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     // ── Konfirmasi manual kasir ─────────────────────────────────────

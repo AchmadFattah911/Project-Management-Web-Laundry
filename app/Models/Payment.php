@@ -13,6 +13,11 @@ class Payment extends Model
 
     public const GATEWAY_MANUAL = 'manual';
 
+    /** Penanda pembayaran yang perlu ditinjau admin (halaman "Perlu Refund", Tahap 5). */
+    public const FLAG_AMOUNT_MISMATCH = 'amount_mismatch';
+    public const FLAG_DUPLICATE_PAID = 'duplicate_paid_needs_refund';
+    public const FLAG_PAID_AFTER_CLOSED = 'paid_after_closed';
+
     protected $fillable = [
         'order_id',
         'checkout_id',
@@ -22,7 +27,11 @@ class Payment extends Model
         'reference',
         'idempotency_key',
         'checkout_url',
+        'snap_token',
+        'transaction_id',
+        'payment_type',
         'status',
+        'review_flag',
         'paid_at',
         'expires_at',
         'meta',

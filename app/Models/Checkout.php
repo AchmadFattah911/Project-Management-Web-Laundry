@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\Rupiah;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Satu transaksi pembayaran pelanggan yang mengelompokkan beberapa order dari keranjang.
@@ -15,6 +16,10 @@ class Checkout extends Model
     public const STATUS_PAID = 'lunas';
     public const STATUS_FAILED = 'gagal';
     public const STATUS_EXPIRED = 'kadaluarsa';
+    public const STATUS_CANCELLED = 'dibatalkan';
+
+    /** Transaksi yang sudah berhenti tanpa dibayar: boleh "Pesan Lagi". */
+    public const CLOSED_UNPAID = [self::STATUS_FAILED, self::STATUS_EXPIRED, self::STATUS_CANCELLED];
 
     /** Alasan transaksi masih/berhenti menunggu pembayaran, ditampilkan ke pelanggan. */
     public const PENDING_REASONS = ['menunggu_transfer', 'popup_ditutup', 'ditolak', 'kedaluwarsa'];
@@ -74,6 +79,20 @@ class Checkout extends Model
     public function totalRupiah(): int
     {
         return Rupiah::parse($this->total_amount);
+    }
+
+    public function isAwaitingPayment(): bool
+    {
+        return $this->status === self::STATUS_AWAITING;
+    }
+
+    /**
+     * Batas bayar efektif. Transaksi lama (sebelum kolom payment_deadline ada) memakai created_at + masa bayar.
+     */
+    public function paymentDeadline(): Carbon
+    {
+        return $this->payment_deadline
+            ?? $this->created_at->copy()->addMinutes((int) config('payment.expiry_minutes', 60));
     }
 
     public function isPaid(): bool

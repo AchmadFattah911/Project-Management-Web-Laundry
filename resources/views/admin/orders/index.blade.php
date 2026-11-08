@@ -226,6 +226,8 @@
                                         'payment_status' => $payStatus,
                                         'payment_method' => $payment?->method ?? 'cash',
                                         'can_edit_qty' => in_array($order->status, ['pending', 'diproses']) && ! $order->checkout_id && ! $order->isPaid(),
+                                        // Transaksi online Midtrans: lunas hanya dari konfirmasi gateway (bukan tombol manual)
+                                        'manual_confirm' => ! ($order->checkout_id && \App\Services\SnapPaymentService::enabled()),
                                     ]) }})"
                                     class="px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs transition-colors"
                                 >
@@ -578,7 +580,13 @@
                                     </div>
                                 </template>
 
-                                <template x-if="selectedOrder.payment_status !== 'paid'">
+                                <template x-if="selectedOrder.payment_status !== 'paid' && ! selectedOrder.manual_confirm">
+                                    <p class="p-3 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs">
+                                        Pesanan online dibayar lewat Midtrans. Status lunas diperbarui otomatis dari konfirmasi Midtrans, tidak bisa ditandai lunas manual.
+                                    </p>
+                                </template>
+
+                                <template x-if="selectedOrder.payment_status !== 'paid' && selectedOrder.manual_confirm">
                                     <form :action="'/admin/orders/' + selectedOrder.id + '/payment'" method="POST" class="flex items-center gap-3">
                                         @csrf
                                         <select

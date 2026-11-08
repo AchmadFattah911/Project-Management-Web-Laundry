@@ -52,6 +52,28 @@ class DatabaseSchemaTest extends TestCase
         $this->assertContains('status,payment_deadline', $indexes);
 
         $this->assertTrue(Schema::hasColumns('order_status_logs', ['checkout_id', 'order_id', 'from_status', 'to_status', 'note', 'actor_type', 'actor_id', 'created_at']));
+
+        foreach (['snap_token', 'transaction_id', 'payment_type', 'review_flag'] as $column) {
+            $this->assertTrue($nullable('payments', $column), "payments.{$column} harus nullable");
+        }
+
+        $pendingOwner = DB::selectOne("SHOW COLUMNS FROM payments WHERE Field = 'pending_owner'");
+        $this->assertSame('VIRTUAL GENERATED', $pendingOwner->Extra);
+    }
+
+    public function test_enum_status_transaksi_hanya_ditambah_di_akhir(): void
+    {
+        $type = DB::selectOne("SHOW COLUMNS FROM checkouts WHERE Field = 'status'")->Type;
+
+        $this->assertSame("enum('menunggu_pembayaran','lunas','gagal','kadaluarsa','dibatalkan')", $type);
+    }
+
+    public function test_kunci_unik_pembayaran_midtrans(): void
+    {
+        $unique = collect(Schema::getIndexes('payments'))->where('unique', true)->map(fn ($i) => implode(',', $i['columns']));
+
+        $this->assertContains('transaction_id', $unique);
+        $this->assertContains('pending_owner', $unique);
     }
 
     public function test_kunci_unik_penjaga_idempotency_ada_di_database(): void

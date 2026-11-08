@@ -67,10 +67,10 @@ class RoleAccessVerificationTest extends TestCase
             'status'      => 'pending',
         ]);
 
-        // Pelanggan 1 akses pesanan pelanggan 2 -> 403 Forbidden
+        // Pelanggan 1 akses pesanan pelanggan 2 -> 404 (keberadaan pesanan tidak diungkap)
         $this->actingAs($pelanggan1)
             ->get(route('pelanggan.orders.show', $orderPelanggan2))
-            ->assertStatus(403);
+            ->assertNotFound();
 
         // Pelanggan 2 akses pesanan sendiri -> 200 OK
         $this->actingAs($pelanggan2)

@@ -353,6 +353,11 @@ class PaymentService
             throw new InvalidArgumentException('Metode pembayaran tidak valid.');
         }
 
+        // C4: saat Midtrans aktif, transaksi online hanya lunas dari konfirmasi gateway
+        if ($order->checkout_id && SnapPaymentService::enabled()) {
+            throw new InvalidArgumentException('Pesanan online dibayar lewat Midtrans dan tidak bisa ditandai lunas manual. Gunakan "Cek status ke Midtrans".');
+        }
+
         return DB::transaction(function () use ($order, $method, $actor) {
             if ($order->checkout_id) {
                 $owner = Checkout::whereKey($order->checkout_id)->lockForUpdate()->firstOrFail();

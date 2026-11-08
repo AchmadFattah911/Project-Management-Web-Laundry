@@ -139,7 +139,7 @@ class BackendArchitectureTest extends TestCase
 
         $response = $this->actingAs($pelangganA)->get(route('pelanggan.orders.show', $orderB));
 
-        $response->assertStatus(403);
+        $response->assertNotFound();
     }
 
     /**

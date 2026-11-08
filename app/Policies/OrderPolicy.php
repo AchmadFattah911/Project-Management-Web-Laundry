@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\Order;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class OrderPolicy
 {
@@ -20,13 +21,16 @@ class OrderPolicy
      * Pelanggan hanya boleh melihat detail pesanan miliknya sendiri.
      * Admin dan Pegawai dapat melihat seluruh pesanan.
      */
-    public function view(User $user, Order $order): bool
+    public function view(User $user, Order $order): Response
     {
         if ($user->isAdmin() || $user->isPegawai()) {
-            return true;
+            return Response::allow();
         }
 
-        return $order->user_id !== null && ((int) $order->user_id === (int) $user->id);
+        // Pesanan orang lain dijawab 404 agar keberadaannya tidak terungkap
+        return $order->user_id !== null && ((int) $order->user_id === (int) $user->id)
+            ? Response::allow()
+            : Response::denyAsNotFound();
     }
 
     /**

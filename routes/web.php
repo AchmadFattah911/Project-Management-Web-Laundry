@@ -30,12 +30,12 @@ Route::view('/aturan-penggunaan', 'pages.aturan')->name('aturan');
 
 // Tracking order publik (hanya via order_code, data minimal tanpa data pribadi, dengan rate limiting)
 Route::get('/tracking', [OrderTrackingController::class, 'index'])
-    ->middleware('throttle:60,1')
+    ->middleware('throttle:60,1,tracking:')
     ->name('tracking');
 
 // Notifikasi status pembayaran dari payment gateway (tanpa CSRF, diverifikasi lewat signature)
 Route::post('/payments/webhook/{gateway}', PaymentWebhookController::class)
-    ->middleware('throttle:120,1')
+    ->middleware('throttle:120,1,payments.webhook:')
     ->name('payments.webhook');
 
 // Halaman checkout dummy untuk tester (otomatis 404 di production / jika dinonaktifkan)
@@ -83,7 +83,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])
 
         // Manajemen Order
         Route::get('/orders', [AdminOrderController::class, 'index'])->name('orders.index');
-        Route::post('/orders', [AdminOrderController::class, 'store'])->middleware('throttle:30,1')->name('orders.store');
+        Route::post('/orders', [AdminOrderController::class, 'store'])->middleware('throttle:30,1,orders.store:')->name('orders.store');
         Route::put('/orders/{order}', [AdminOrderController::class, 'update'])->name('orders.update');
         Route::delete('/orders/{order}', [AdminOrderController::class, 'destroy'])->name('orders.destroy');
         Route::put('/orders/process/{process}', [AdminOrderController::class, 'updateProcess'])->name('orders.process');
@@ -108,7 +108,7 @@ Route::middleware(['auth', 'verified', 'role:pegawai'])
 
         // Manajemen Order & Kasir Walk-in
         Route::get('/orders', [PegawaiOrderController::class, 'index'])->name('orders.index');
-        Route::post('/orders', [PegawaiOrderController::class, 'store'])->middleware('throttle:30,1')->name('orders.store');
+        Route::post('/orders', [PegawaiOrderController::class, 'store'])->middleware('throttle:30,1,orders.store:')->name('orders.store');
         Route::put('/orders/{order}', [PegawaiOrderController::class, 'update'])->name('orders.update');
 
         // Update tahapan pengerjaan (cuci, kering, lipat)
@@ -141,10 +141,10 @@ Route::middleware(['auth', 'verified', 'role:pelanggan'])
     ->group(function () {
         Route::get('/', [PelangganCartController::class, 'index'])->name('pesan.index');
         Route::get('/keranjang', [PelangganCartController::class, 'cart'])->name('cart.index');
-        Route::post('/keranjang', [PelangganCartController::class, 'store'])->middleware('throttle:30,1')->name('cart.store');
+        Route::post('/keranjang', [PelangganCartController::class, 'store'])->middleware('throttle:30,1,cart.store:')->name('cart.store');
         Route::patch('/keranjang/{item}', [PelangganCartController::class, 'update'])->whereNumber('item')->name('cart.update');
         Route::delete('/keranjang/{item}', [PelangganCartController::class, 'destroy'])->whereNumber('item')->name('cart.destroy');
-        Route::post('/checkout', [PelangganCheckoutController::class, 'store'])->middleware('throttle:10,1')->name('checkout.store');
+        Route::post('/checkout', [PelangganCheckoutController::class, 'store'])->middleware('throttle:10,1,checkout.store:')->name('checkout.store');
     });
 
 // Halaman pembayaran transaksi (1 transaksi = beberapa order dari keranjang)
@@ -154,8 +154,12 @@ Route::middleware(['auth', 'verified', 'role:pelanggan'])
     ->group(function () {
         Route::get('/{checkout:code}', [PelangganCheckoutController::class, 'show'])->name('show');
         Route::get('/{checkout:code}/selesai', [PelangganCheckoutController::class, 'finished'])->name('selesai');
-        Route::get('/{checkout:code}/status', [PelangganCheckoutController::class, 'status'])->middleware('throttle:60,1')->name('status');
-        Route::post('/{checkout:code}/bayar', [PelangganCheckoutController::class, 'pay'])->middleware('throttle:20,1')->name('pay');
+        Route::get('/{checkout:code}/status', [PelangganCheckoutController::class, 'status'])->middleware('throttle:60,1,status:')->name('status');
+        Route::post('/{checkout:code}/bayar', [PelangganCheckoutController::class, 'pay'])->middleware('throttle:20,1,pay:')->name('pay');
+        // Milik orang lain → 404 (policy); rate limit per pelanggan
+        Route::post('/{checkout:code}/batal', [PelangganCheckoutController::class, 'cancel'])->middleware('throttle:10,1,cancel:')->name('cancel');
+        Route::post('/{checkout:code}/popup-ditutup', [PelangganCheckoutController::class, 'popupClosed'])->middleware('throttle:30,1,popup-closed:')->name('popup-closed');
+        Route::post('/{checkout:code}/pesan-lagi', [PelangganCheckoutController::class, 'reorder'])->middleware('throttle:10,1,reorder:')->name('reorder');
     });
 
 // Halaman Akun pelanggan (profil + riwayat pemesanan, gaya aplikasi mobile)

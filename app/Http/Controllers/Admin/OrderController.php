@@ -115,7 +115,11 @@ class OrderController extends Controller
             return back()->with('error', 'Pesanan ini sudah lunas sebelumnya.');
         }
 
-        app(\App\Services\PaymentService::class)->confirmManually($order, $validated['method'], $request->user());
+        try {
+            app(\App\Services\PaymentService::class)->confirmManually($order, $validated['method'], $request->user());
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', 'Pembayaran pesanan berhasil dikonfirmasi lunas.');
     }

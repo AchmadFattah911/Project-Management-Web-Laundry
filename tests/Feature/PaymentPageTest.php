@@ -157,7 +157,7 @@ class PaymentPageTest extends TestCase
     {
         $this->notify($this->pay(), 'paid');
 
-        $this->actingAs($this->makeUser())->get(route('pelanggan.pembayaran.selesai', $this->checkout))->assertForbidden();
+        $this->actingAs($this->makeUser())->get(route('pelanggan.pembayaran.selesai', $this->checkout))->assertNotFound();
     }
 
     public function test_simulasi_bayar_berhasil_langsung_ke_halaman_selesai(): void
@@ -185,6 +185,6 @@ class PaymentPageTest extends TestCase
         $this->actingAs($this->pelanggan)->getJson(route('pelanggan.pembayaran.status', $this->checkout))
             ->assertJson(['paid' => true, 'status' => 'lunas', 'payment_status' => 'paid']);
 
-        $this->actingAs($this->makeUser())->getJson(route('pelanggan.pembayaran.status', $this->checkout))->assertForbidden();
+        $this->actingAs($this->makeUser())->getJson(route('pelanggan.pembayaran.status', $this->checkout))->assertNotFound();
     }
 }

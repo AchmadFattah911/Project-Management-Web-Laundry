@@ -77,6 +77,11 @@ class OrderController extends Controller
     {
         $this->authorize('view', $order);
 
+        // Pesanan tunggal lama tidak dibayar lewat Midtrans (hanya transaksi keranjang)
+        if (\App\Services\SnapPaymentService::enabled()) {
+            return back()->with('error', 'Pembayaran online untuk pesanan lama ini tidak tersedia. Silakan bayar langsung di outlet.');
+        }
+
         $validated = $request->validate([
             'payment_method' => ['required', Rule::in(PaymentService::onlineMethods())],
         ], [

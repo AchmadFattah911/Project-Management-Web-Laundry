@@ -9,10 +9,14 @@ use App\Models\Checkout;
 use App\Models\Order;
 use App\Services\CheckoutResult;
 use App\Services\CheckoutService;
+use App\Services\CartService;
 use App\Services\PaymentService;
+use App\Services\SnapPaymentService;
+use App\Payments\Gateways\MidtransGateway;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -28,6 +32,8 @@ class CheckoutController extends Controller
     public function __construct(
         protected CheckoutService $checkoutService,
         protected PaymentService $paymentService,
+        protected SnapPaymentService $snapPayments,
+        protected CartService $cartService,
     ) {}
 
     public function store(StoreCheckoutRequest $request)
@@ -45,7 +51,7 @@ class CheckoutController extends Controller
         return redirect()->route('pelanggan.pembayaran.show', $result->checkout)->with($type, $message);
     }
 
-    public function show(Checkout $checkout)
+    public function show(Request $request, Checkout $checkout)
     {
         $this->authorize('view', $checkout);
 
@@ -63,6 +69,12 @@ class CheckoutController extends Controller
             'checkout'       => $checkout,
             'payment'        => $checkout->paymentForDisplay(),
             'paymentMethods' => config('laundry.online_payment_methods', []),
+            // ?verifikasi=1 = kembali dari Snap: tampilkan "sedang memverifikasi" + polling (tanpa ubah status)
+            'verifying'      => $request->boolean('verifikasi'),
+            'snap'           => SnapPaymentService::enabled() ? [
+                'js_url'     => MidtransGateway::snapJsUrl(),
+                'client_key' => MidtransGateway::clientKey(),
+            ] : null,
         ]);
     }
 
@@ -123,6 +135,15 @@ class CheckoutController extends Controller
     {
         $this->authorize('view', $checkout);
 
+        // Transaksi yang dibatalkan / kedaluwarsa / gagal tidak bisa dibayar lagi (berlaku juga untuk gateway lama)
+        if (! $checkout->isAwaitingPayment() && ! $checkout->isPaid()) {
+            return $this->failed($request, $checkout, "Transaksi {$checkout->code} sudah {$checkout->status} dan tidak bisa dibayar lagi.", 422);
+        }
+
+        if (SnapPaymentService::enabled()) {
+            return $this->paySnap($request, $checkout);
+        }
+
         $validated = $request->validate([
             'payment_method' => ['required', Rule::in(PaymentService::onlineMethods())],
         ], [
@@ -147,6 +168,98 @@ class CheckoutController extends Controller
         }
 
         return redirect()->away($response['checkout_url']);
+    }
+
+    /**
+     * Midtrans Snap: kembalikan snap_token tagihan aktif (atau buat satu). Klik berkali-kali = token yang sama.
+     * Status lunas TIDAK pernah diset di sini, hanya oleh notifikasi gateway.
+     */
+    protected function paySnap(Request $request, Checkout $checkout)
+    {
+        try {
+            $result = $this->snapPayments->pay($checkout, $request->user());
+        } catch (IdempotencyException $e) {
+            // Tagihan sedang dibuat request lain: browser menunggu sebentar lalu mencoba lagi
+            return $this->failed($request, $checkout, $e->getMessage(), 409)->header('Retry-After', '2');
+        } catch (InvalidArgumentException|RuntimeException $e) {
+            return $this->failed($request, $checkout, $e->getMessage(), 422);
+        }
+
+        $payment = $result['payment'];
+
+        if ($request->expectsJson()) {
+            return response()
+                ->json([
+                    'data' => [
+                        'snap_token'   => $payment->snap_token,
+                        'redirect_url' => $payment->checkout_url,
+                        'reference'    => $payment->reference,
+                    ],
+                    'replayed' => $result['replayed'],
+                ], $result['replayed'] ? 200 : 201)
+                ->header('Idempotent-Replayed', $result['replayed'] ? 'true' : 'false');
+        }
+
+        // Tanpa JavaScript: halaman pembayaran Snap (redirect mode)
+        return redirect()->away($payment->checkout_url);
+    }
+
+    /**
+     * POST /pembayaran/{code}/batal
+     */
+    public function cancel(Request $request, Checkout $checkout)
+    {
+        $this->authorize('view', $checkout);
+
+        try {
+            $this->snapPayments->cancel($checkout, $request->user());
+        } catch (InvalidArgumentException $e) {
+            return redirect()->route('pelanggan.pembayaran.show', $checkout)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route('pelanggan.pembayaran.show', $checkout)
+            ->with('status', "Transaksi {$checkout->code} dibatalkan. Tidak ada dana yang ditagih.");
+    }
+
+    /**
+     * POST /pembayaran/{code}/popup-ditutup (dipanggil snap.js onClose). Hanya informasi, tanpa ubah status.
+     */
+    public function popupClosed(Checkout $checkout)
+    {
+        $this->authorize('view', $checkout);
+
+        $this->snapPayments->markPopupClosed($checkout);
+
+        return response()->noContent();
+    }
+
+    /**
+     * POST /pembayaran/{code}/pesan-lagi: salin item transaksi gagal/kedaluwarsa/dibatalkan ke keranjang
+     * dengan harga terbaru.
+     */
+    public function reorder(Request $request, Checkout $checkout)
+    {
+        $this->authorize('view', $checkout);
+
+        try {
+            $result = $this->cartService->reorderFromCheckout($request->user(), $checkout);
+        } catch (ValidationException $e) {
+            return redirect()->route('pelanggan.cart.index')->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        $skipped = $result['skipped'];
+
+        if ($result['added']->isEmpty()) {
+            return redirect()->route('pelanggan.cart.index')
+                ->with('error', 'Layanan pada transaksi ini sudah tidak tersedia: ' . implode(', ', $skipped) . '.');
+        }
+
+        $redirect = redirect()->route('pelanggan.cart.index')
+            ->with('success', 'Layanan dari transaksi ' . $checkout->code . ' sudah dimasukkan ke keranjang dengan harga terbaru.');
+
+        return $skipped
+            ? $redirect->with('status', 'Dilewati karena sudah tidak tersedia: ' . implode(', ', $skipped) . '.')
+            : $redirect;
     }
 
     protected function failed(Request $request, Checkout $checkout, string $message, int $status)
