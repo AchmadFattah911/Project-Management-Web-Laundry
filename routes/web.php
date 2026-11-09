@@ -10,6 +10,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\Panel\CustomerController as PanelCustomerController;
 use App\Http\Controllers\Panel\ExpenseController as PanelExpenseController;
+use App\Http\Controllers\Panel\ExportController as PanelExportController;
 use App\Http\Controllers\Panel\PeriodController as PanelPeriodController;
 use App\Http\Controllers\Panel\ReportController as PanelReportController;
 use App\Http\Controllers\Panel\ShiftController as PanelShiftController;
@@ -244,6 +245,9 @@ Route::middleware(['auth', 'verified', 'role:admin,pegawai'])
 
         // Laporan keuangan & tutup buku (admin)
         Route::get('/laporan', [PanelReportController::class, 'index'])->middleware(['can:laporan.view', 'throttle:60,1,panel.laporan:'])->name('laporan.index');
+        Route::get('/ekspor', [PanelExportController::class, 'index'])->middleware('can:laporan.export')->name('ekspor.index');
+        Route::post('/ekspor', [PanelExportController::class, 'store'])->middleware(['can:laporan.export', 'throttle:10,1,panel.ekspor.store:'])->name('ekspor.store');
+        Route::get('/ekspor/{export}/unduh', [PanelExportController::class, 'download'])->middleware(['can:laporan.export', 'throttle:30,1,panel.ekspor.unduh:'])->name('ekspor.download');
         Route::get('/tutup-buku', [PanelPeriodController::class, 'index'])->middleware('can:periode.close')->name('periode.index');
         Route::post('/tutup-buku', [PanelPeriodController::class, 'store'])->middleware(['can:periode.close', 'throttle:10,1,panel.periode.store:'])->name('periode.store');
 
