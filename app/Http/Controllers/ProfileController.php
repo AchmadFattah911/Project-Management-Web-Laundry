@@ -53,7 +53,13 @@ class ProfileController extends Controller
 
         Auth::logout();
 
-        $user->delete();
+        // Riwayat transaksi adalah data keuangan: akun yang pernah bertransaksi dinonaktifkan, bukan dihapus
+        if ($user->orders()->exists() || $user->checkouts()->exists()) {
+            $user->forceFill(['is_active' => false, 'deactivated_at' => now()])->save();
+            app(\App\Services\AuditLogger::class)->log('pelanggan.deactivate', $user, null, ['is_active' => false], 'Pengguna menghapus akunnya sendiri', $user);
+        } else {
+            $user->delete();
+        }
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

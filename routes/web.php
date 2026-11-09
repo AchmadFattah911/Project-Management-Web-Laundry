@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\DummyCheckoutController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderTrackingController;
+use App\Http\Controllers\Panel\CustomerController as PanelCustomerController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\Pegawai\DashboardController as PegawaiDashboardController;
 use App\Http\Controllers\Pegawai\FinanceController as PegawaiFinanceController;
@@ -179,6 +180,28 @@ Route::get('/akun', [PelangganAccountController::class, 'index'])
 
 // Dashboard pelanggan lama sudah digantikan halaman Akun; URL lama tetap diarahkan
 Route::redirect('/pelanggan/dashboard', '/akun');
+
+// ─────────────────────────────────────────────
+//  Panel Kasir & Keuangan (admin + pegawai, dibatasi permission per aksi: config/permissions.php)
+// ─────────────────────────────────────────────
+
+// {customer} hanya akun pelanggan; id akun staf → 404
+Route::bind('customer', fn (string $value) => \App\Models\User::where('role', \App\Enums\UserRole::PELANGGAN->value)->findOrFail($value));
+
+Route::middleware(['auth', 'verified', 'role:admin,pegawai'])
+    ->prefix('panel')
+    ->name('panel.')
+    ->group(function () {
+        // Data pelanggan
+        Route::get('/pelanggan', [PanelCustomerController::class, 'index'])->middleware('can:pelanggan.view')->name('pelanggan.index');
+        Route::get('/pelanggan/cari', [PanelCustomerController::class, 'search'])->middleware(['can:pelanggan.view', 'throttle:60,1,panel.pelanggan.cari:'])->name('pelanggan.search');
+        Route::post('/pelanggan', [PanelCustomerController::class, 'store'])->middleware(['can:pelanggan.create', 'throttle:30,1,panel.pelanggan.store:'])->name('pelanggan.store');
+        Route::post('/pelanggan/gabung', [PanelCustomerController::class, 'merge'])->middleware(['can:pelanggan.merge', 'throttle:10,1,panel.pelanggan.merge:'])->name('pelanggan.merge');
+        Route::get('/pelanggan/{customer}', [PanelCustomerController::class, 'show'])->middleware('can:pelanggan.view')->name('pelanggan.show');
+        Route::put('/pelanggan/{customer}', [PanelCustomerController::class, 'update'])->middleware(['can:pelanggan.update', 'throttle:30,1,panel.pelanggan.update:'])->name('pelanggan.update');
+        Route::post('/pelanggan/{customer}/nonaktif', [PanelCustomerController::class, 'deactivate'])->middleware(['can:pelanggan.deactivate', 'throttle:20,1,panel.pelanggan.nonaktif:'])->name('pelanggan.deactivate');
+        Route::post('/pelanggan/{customer}/aktifkan', [PanelCustomerController::class, 'activate'])->middleware(['can:pelanggan.deactivate', 'throttle:20,1,panel.pelanggan.aktifkan:'])->name('pelanggan.activate');
+    });
 
 // ─────────────────────────────────────────────
 //  Profile (Semua Pengguna Terotentikasi)

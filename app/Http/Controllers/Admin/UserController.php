@@ -118,8 +118,8 @@ class UserController extends Controller
         }
 
         // User yang punya order tidak boleh dihapus
-        if ($user->orders()->exists()) {
-            return back()->with('error', 'Pengguna tidak dapat dihapus karena memiliki riwayat pesanan laundry.');
+        if ($user->orders()->exists() || $user->checkouts()->exists()) {
+            return back()->with('error', 'Pengguna tidak dapat dihapus karena memiliki riwayat pesanan laundry. Nonaktifkan lewat menu Pelanggan.');
         }
 
         $user->delete();
