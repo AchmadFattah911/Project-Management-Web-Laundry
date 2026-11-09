@@ -34,7 +34,7 @@
 @endphp
 
 <nav
-    class="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200"
+    class="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 print:hidden"
     style="padding-bottom: env(safe-area-inset-bottom, 0px);"
     aria-label="Navigasi utama"
 >

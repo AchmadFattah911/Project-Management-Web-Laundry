@@ -21,6 +21,8 @@ return [
     // Kontak Outlet
     'phone'      => env('LAUNDRY_PHONE', '[ISI NOMOR HP/TELEPON]'),
     'whatsapp'   => env('LAUNDRY_WHATSAPP', '[ISI NOMOR WHATSAPP]'), // format nomor: misal 628123456789
+    // Nomor WA pegawai di nota pesanan pelanggan; kosong = nomor WhatsApp outlet di atas
+    'staff_whatsapp' => env('LAUNDRY_STAFF_WHATSAPP') ?: env('LAUNDRY_WHATSAPP', '[ISI NOMOR WHATSAPP]'),
     'email'      => env('LAUNDRY_EMAIL', '[ISI EMAIL TOKO]'),
 
     // Zona waktu outlet: batas hari di laporan keuangan (aplikasi menyimpan waktu dalam UTC).

@@ -1,14 +1,23 @@
-@extends('layouts.dashboard')
+{{-- Pelanggan tidak punya dashboard: profil tampil bergaya aplikasi mobile seperti halaman Akun --}}
+@php $isPelanggan = auth()->user()->isPelanggan(); @endphp
+
+@extends($isPelanggan ? 'layouts.mobile' : 'layouts.dashboard', ['bottomNavActive' => 'akun'])
 
 @section('title', 'Pengaturan Profil')
 
 @section('content')
-<div class="max-w-4xl mx-auto space-y-6">
-    <!-- Breadcrumb / Header Title -->
-    <div>
-        <h2 class="text-xl font-bold text-slate-900 tracking-tight">Pengaturan Profil & Keamanan</h2>
-        <p class="text-xs text-slate-500 mt-1">Kelola data profil, kontak, dan kata sandi akun Anda.</p>
-    </div>
+@if ($isPelanggan)
+    @include('pelanggan.partials.page-header', ['title' => 'Pengaturan Profil', 'back' => route('pelanggan.akun')])
+@endif
+
+<div class="{{ $isPelanggan ? 'px-4 py-4 space-y-4' : 'max-w-4xl mx-auto space-y-6' }}">
+    @unless ($isPelanggan)
+        <!-- Breadcrumb / Header Title -->
+        <div>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight">Pengaturan Profil & Keamanan</h2>
+            <p class="text-xs text-slate-500 mt-1">Kelola data profil, kontak, dan kata sandi akun Anda.</p>
+        </div>
+    @endunless
 
     <!-- 1. Form Update Profile Information -->
     <x-card>

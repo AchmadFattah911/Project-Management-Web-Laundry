@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Checkout;
 use App\Models\Order;
-use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,9 +14,11 @@ use Illuminate\Support\Facades\DB;
  * Riwayat pesanan pelanggan sebagai kartu: 1 kartu = 1 transaksi (checkout keranjang),
  * pesanan tunggal lama / walk-in (tanpa checkout) tetap 1 kartu sendiri.
  *
+ * Transaksi yang masih menunggu pembayaran tidak masuk riwayat (dibayar/dibatalkan lewat halaman
+ * pembayaran); riwayat hanya berisi transaksi yang sudah lunas atau sudah ditutup.
+ *
  * Tab:
- *   belum_bayar  transaksi menunggu pembayaran; pesanan lama 'pending' yang belum dibayar
- *   diproses     transaksi lunas yang masih ada pesanan belum selesai; pesanan lama yang sedang dikerjakan
+ *   diproses     transaksi lunas yang masih ada pesanan belum selesai; pesanan lama / walk-in yang belum selesai
  *   selesai      transaksi lunas yang semua pesanannya selesai; pesanan lama selesai
  *   dibatalkan   transaksi dibatalkan / kedaluwarsa / gagal
  *
@@ -27,7 +28,6 @@ class CustomerOrderHistory
 {
     public const TABS = [
         'semua'       => 'Semua',
-        'belum_bayar' => 'Belum Bayar',
         'diproses'    => 'Diproses',
         'selesai'     => 'Selesai',
         'dibatalkan'  => 'Dibatalkan',
@@ -73,18 +73,13 @@ class CustomerOrderHistory
     {
         if ($card instanceof Checkout) {
             return match (true) {
-                $card->isAwaitingPayment() => 'belum_bayar',
                 in_array($card->status, Checkout::CLOSED_UNPAID, true) => 'dibatalkan',
                 $card->orders->isNotEmpty() && $card->orders->every(fn (Order $o) => $o->status === Order::STATUS_SELESAI) => 'selesai',
                 default => 'diproses',
             };
         }
 
-        return match (true) {
-            $card->status === Order::STATUS_SELESAI => 'selesai',
-            $card->status === Order::STATUS_PENDING && ! $card->isPaid() => 'belum_bayar',
-            default => 'diproses',
-        };
+        return $card->status === Order::STATUS_SELESAI ? 'selesai' : 'diproses';
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -107,7 +102,7 @@ class CustomerOrderHistory
 
         return Checkout::query()
             ->where('user_id', $user->id)
-            ->when($tab === 'belum_bayar', fn ($q) => $q->where('status', Checkout::STATUS_AWAITING))
+            ->where('status', '!=', Checkout::STATUS_AWAITING)
             ->when($tab === 'diproses', fn ($q) => $q->where('status', Checkout::STATUS_PAID)->whereHas('orders', $unfinished))
             ->when($tab === 'selesai', fn ($q) => $q->where('status', Checkout::STATUS_PAID)->whereHas('orders')->whereDoesntHave('orders', $unfinished))
             ->when($tab === 'dibatalkan', fn ($q) => $q->whereIn('status', Checkout::CLOSED_UNPAID));
@@ -115,16 +110,11 @@ class CustomerOrderHistory
 
     protected function standaloneOrders(User $user, string $tab): Builder
     {
-        $paid = fn ($q) => $q->where('status', Payment::STATUS_PAID);
-
         return Order::query()
             ->where('user_id', $user->id)
             ->whereNull('checkout_id')
-            ->when($tab === 'belum_bayar', fn ($q) => $q->where('status', Order::STATUS_PENDING)->whereDoesntHave('payments', $paid))
-            // Sudah dikerjakan dianggap berjalan walau tercatat belum lunas (data walk-in lama)
-            ->when($tab === 'diproses', fn ($q) => $q->where(fn ($q) => $q
-                ->whereIn('status', [Order::STATUS_DIPROSES, Order::STATUS_SIAP_DIAMBIL])
-                ->orWhere(fn ($q) => $q->where('status', Order::STATUS_PENDING)->whereHas('payments', $paid))))
+            // Pesanan di outlet dibayar di kasir: yang belum selesai (termasuk antre / belum lunas) = berjalan
+            ->when($tab === 'diproses', fn ($q) => $q->where('status', '!=', Order::STATUS_SELESAI))
             ->when($tab === 'selesai', fn ($q) => $q->where('status', Order::STATUS_SELESAI))
             ->when($tab === 'dibatalkan', fn ($q) => $q->whereRaw('1 = 0'));
     }

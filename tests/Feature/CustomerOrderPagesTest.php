@@ -14,8 +14,9 @@ use Tests\Concerns\CreatesLaundryData;
 use Tests\TestCase;
 
 /**
- * Tahap 6: halaman pesanan pelanggan (/akun dan /pelanggan/orders) dengan tab Belum Bayar / Diproses /
- * Selesai / Dibatalkan, 1 kartu = 1 transaksi, dan detail transaksi dengan timeline.
+ * Halaman pesanan pelanggan (/akun dan /pelanggan/orders) dengan tab Diproses / Selesai / Dibatalkan,
+ * 1 kartu = 1 transaksi, dan detail transaksi berupa nota + timeline. Transaksi yang belum dibayar
+ * tidak masuk riwayat (dibayar / dibatalkan di halaman pembayaran).
  */
 class CustomerOrderPagesTest extends TestCase
 {
@@ -84,7 +85,6 @@ class CustomerOrderPagesTest extends TestCase
         $mixed->orders()->first()->update(['status' => Order::STATUS_SIAP_DIAMBIL]);
 
         $expected = [
-            'belum_bayar' => [$awaiting->code],
             'diproses'    => [$processing->code, $mixed->code, 'LC-WALKIN1'],
             'selesai'     => [$done->code],
             'dibatalkan'  => [$expired->code, $failed->code, $cancelled->code],
@@ -97,17 +97,18 @@ class CustomerOrderPagesTest extends TestCase
             }
         }
 
-        // Semua: 8 kartu untuk 8 transaksi/pesanan (bukan 15 baris order)
+        // Semua: 7 kartu untuk 7 transaksi/pesanan (bukan 13 baris order); yang belum dibayar tidak tampil
         $all = $this->cardCodes($this->actingAs($this->pelanggan)->get(route('pelanggan.orders.index'))->getContent());
-        $this->assertCount(8, $all);
+        $this->assertCount(7, $all);
+        $this->assertNotContains($awaiting->code, $all);
         $this->assertSame(count($all), count(array_unique($all)));
         $this->assertNotNull($walkIn);
     }
 
     public function test_hanya_transaksi_milik_pelanggan_yang_tampil(): void
     {
-        $mine = $this->checkout(Checkout::STATUS_AWAITING);
-        $other = $this->checkout(Checkout::STATUS_AWAITING, user: $this->makeUser());
+        $mine = $this->checkout(Checkout::STATUS_PAID);
+        $other = $this->checkout(Checkout::STATUS_PAID, user: $this->makeUser());
 
         $html = $this->actingAs($this->pelanggan)->get(route('pelanggan.orders.index'))->getContent();
 
@@ -137,25 +138,46 @@ class CustomerOrderPagesTest extends TestCase
         $this->assertCount(5, $this->cardCodes($this->actingAs($this->pelanggan)->get(route('pelanggan.akun', ['status' => 'dibatalkan']))->getContent()));
     }
 
-    public function test_kartu_belum_bayar_berisi_hitung_mundur_bayar_batal_dan_info_va(): void
+    public function test_transaksi_belum_dibayar_tidak_masuk_riwayat_dan_detailnya_ke_halaman_pembayaran(): void
     {
-        $checkout = $this->checkout(Checkout::STATUS_AWAITING, attributes: ['pending_reason' => 'menunggu_transfer']);
-        $checkout->payments()->create([
-            'amount' => $checkout->total_amount, 'method' => 'transfer', 'gateway' => 'midtrans', 'reference' => $checkout->code . '-P1',
-            'status' => Payment::STATUS_PENDING, 'snap_token' => 'tok', 'payment_type' => 'bank_transfer',
-            'meta' => ['midtrans' => ['instruction' => ['bank' => 'BCA', 'number' => '70012345678']]],
-        ]);
+        $checkout = $this->checkout(Checkout::STATUS_AWAITING);
 
-        $html = $this->actingAs($this->pelanggan)->get(route('pelanggan.orders.index', ['status' => 'belum_bayar']))->getContent();
+        foreach (['pelanggan.orders.index', 'pelanggan.akun'] as $route) {
+            $html = $this->actingAs($this->pelanggan)->get(route($route))->assertOk()->getContent();
+            $this->assertStringNotContainsString($checkout->code, $html, $route);
+            $this->assertStringNotContainsString('Belum Bayar', $html, $route);
+        }
 
-        $this->assertStringContainsString('deadline: ' . $checkout->paymentDeadline()->getTimestampMs(), $html);
-        $this->assertStringContainsString("expired ? 'Kedaluwarsa' : label", $html, 'Hitung mundur berganti Kedaluwarsa tanpa reload.');
-        $this->assertStringContainsString('href="' . route('pelanggan.pembayaran.show', $checkout) . '"', $html);
-        $this->assertStringContainsString('action="' . route('pelanggan.pembayaran.cancel', $checkout) . '"', $html);
-        $this->assertStringContainsString('Bayar Sekarang', $html);
-        $this->assertStringContainsString('70012345678', $html);
-        $this->assertStringContainsString('Virtual Account', $html);
-        $this->assertStringContainsString('Selesaikan transfer sebelum batas waktu', $html, 'Keterangan dari pending_reason menunggu_transfer.');
+        $this->actingAs($this->pelanggan)->get(route('pelanggan.transaksi.show', $checkout))
+            ->assertRedirect(route('pelanggan.pembayaran.show', $checkout));
+    }
+
+    public function test_detail_transaksi_berupa_nota_untuk_outlet(): void
+    {
+        config(['laundry.staff_whatsapp' => '0812-3456-7890']);
+        $this->pelanggan->update(['phone' => '089999999999']);
+        $checkout = $this->checkout(Checkout::STATUS_PAID, orderStatus: Order::STATUS_DIPROSES);
+        $checkout->payments()->first()->update(['payment_type' => 'qris']);
+        $checkout->forceFill(['paid_at' => now()->setTimezone('UTC')->setTime(3, 5)])->save();
+
+        $html = $this->actingAs($this->pelanggan)->get(route('pelanggan.transaksi.show', $checkout))->assertOk()->getContent();
+        $nota = substr($html, strpos($html, 'data-nota='));
+
+        $this->assertStringContainsString('Nota Pesanan', $nota);
+        $this->assertStringContainsString($checkout->code, $nota);
+        $this->assertStringContainsString('Pembayaran Lunas', $nota);
+        $this->assertMatchesRegularExpression('/data-nota-paid-at>\s*\d{2} \w+ \d{4}, 10:05 WIB/', $nota, 'Waktu pembayaran dalam WIB.');
+        $this->assertStringContainsString('QRIS', $nota);
+        $this->assertStringContainsString('081234567890', $nota, 'Nomor telepon kontak transaksi.');
+        $this->assertStringContainsString('Rp 10.000', $nota);
+        $this->assertStringContainsString('Rp 20.000', $nota, 'Total transaksi.');
+        $this->assertStringContainsString('0812-3456-7890', $nota);
+        $this->assertStringContainsString('https://wa.me/6281234567890', $nota);
+        $this->assertStringContainsString('Tunjukkan nota ini ke petugas', $nota);
+
+        // Halaman pelanggan tidak lagi memakai layout dashboard (sidebar)
+        $this->assertStringContainsString('aria-label="Navigasi utama"', $html);
+        $this->assertStringNotContainsString('<aside', $html);
     }
 
     public function test_kartu_dibatalkan_punya_tombol_pesan_lagi(): void
@@ -167,6 +189,21 @@ class CustomerOrderPagesTest extends TestCase
         $this->assertStringContainsString('action="' . route('pelanggan.pembayaran.reorder', $checkout) . '"', $html);
         $this->assertStringContainsString('Kedaluwarsa', $html);
         $this->assertStringNotContainsString('action="' . route('pelanggan.pembayaran.cancel', $checkout) . '"', $html);
+
+        // Nota transaksi yang ditutup: cap Kedaluwarsa, tidak berlaku, ada tombol Pesan Lagi
+        $nota = $this->actingAs($this->pelanggan)->get(route('pelanggan.transaksi.show', $checkout))->assertOk()->getContent();
+        $this->assertStringContainsString('Kedaluwarsa', $nota);
+        $this->assertStringContainsString('tidak berlaku sebagai bukti pesanan', $nota);
+        $this->assertStringContainsString('action="' . route('pelanggan.pembayaran.reorder', $checkout) . '"', $nota);
+        $this->assertStringNotContainsString('Pembayaran Lunas', $nota);
+    }
+
+    public function test_profil_pelanggan_tanpa_dashboard(): void
+    {
+        $html = $this->actingAs($this->pelanggan)->get(route('profile.edit'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('aria-label="Navigasi utama"', $html);
+        $this->assertStringNotContainsString('<aside', $html);
     }
 
     public function test_timeline_dari_log_status(): void

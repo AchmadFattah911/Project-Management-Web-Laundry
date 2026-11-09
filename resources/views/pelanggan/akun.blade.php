@@ -6,7 +6,6 @@
 @php
     $tabTitles = [
         'semua'       => 'Belum ada pesanan',
-        'belum_bayar' => 'Tidak ada pesanan yang menunggu pembayaran',
         'diproses'    => 'Tidak ada pesanan yang sedang diproses',
         'selesai'     => 'Belum ada pesanan yang selesai',
         'dibatalkan'  => 'Tidak ada pesanan yang dibatalkan',

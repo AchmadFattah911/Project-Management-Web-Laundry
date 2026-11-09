@@ -56,7 +56,7 @@ class OrderController extends Controller
     {
         $this->authorize('view', $order);
 
-        $order->load(['service', 'payments', 'checkout.payments', 'orderProcesses.pegawai', 'statusLogs']);
+        $order->load(['user', 'service', 'payments', 'checkout.payments', 'orderProcesses.pegawai', 'statusLogs']);
 
         return view('pelanggan.orders.show', [
             'order'          => $order,
