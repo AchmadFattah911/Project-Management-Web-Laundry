@@ -15,6 +15,11 @@ class Checkout extends Model
     public const CHANNEL_ONLINE = 'online';
     public const CHANNEL_OUTLET = 'outlet';
 
+    public const REFUND_NONE = 'none';
+    public const REFUND_PROCESSING = 'diproses';
+    public const REFUND_DONE = 'selesai';
+    public const REFUND_FAILED = 'gagal';
+
     public const TIMING_NOW = 'now';
     public const TIMING_ON_PICKUP = 'on_pickup';
 
@@ -38,6 +43,7 @@ class Checkout extends Model
         'payment_timing',
         'outlet_method',
         'shift_id',
+        'refund_status',
         'total_amount',
         'status',
         'payment_deadline',
@@ -80,6 +86,17 @@ class Checkout extends Model
     public function shift()
     {
         return $this->belongsTo(CashShift::class, 'shift_id');
+    }
+
+    public function refund()
+    {
+        return $this->hasOne(Refund::class);
+    }
+
+    /** Dibatalkan pelanggan setelah lunas (status checkout tetap lunas; lihat refund_status). */
+    public function isCancelledAfterPayment(): bool
+    {
+        return ($this->refund_status ?? self::REFUND_NONE) !== self::REFUND_NONE;
     }
 
     public function voidRequests()

@@ -32,6 +32,7 @@
         default                              => 'Dibatalkan',
     };
     $stamp = match (true) {
+        $isCheckout && $card->isCancelledAfterPayment() => ['text-rose-600 border-rose-300', 'Dibatalkan · Refund'],
         $group === 'dibatalkan' => ['text-rose-600 border-rose-300', $closedLabel],
         $paid                   => ['text-emerald-600 border-emerald-300', 'Pembayaran Lunas'],
         default                 => ['text-amber-600 border-amber-300', 'Bayar di Kasir'],

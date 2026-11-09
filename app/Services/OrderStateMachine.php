@@ -135,6 +135,10 @@ class OrderStateMachine
                 return false;
             }
 
+            if ($from === Order::STATUS_DIBATALKAN) {
+                throw new InvalidStatusTransition("Pesanan {$locked->order_code} sudah dibatalkan dan direfund.");
+            }
+
             // Selesai = final, kecuali koreksi admin dalam jendela waktu (selalu mundur, jadi catatan tetap wajib di bawah)
             if (in_array($from, self::ORDER_FINAL, true) && ! ($actorType === self::ACTOR_ADMIN && $this->withinCorrectionWindow($locked))) {
                 throw new InvalidStatusTransition($actorType === self::ACTOR_ADMIN
@@ -181,6 +185,24 @@ class OrderStateMachine
 
             return true;
         });
+    }
+
+    /**
+     * Pembatalan setelah bayar (lihat OnlineCancellationService): semua item pending → dibatalkan, tercatat di log.
+     * Dipanggil di dalam transaksi DB yang sudah mengunci checkout.
+     */
+    public function cancelOrders(Checkout $checkout, User $actor, string $note): void
+    {
+        $orders = Order::where('checkout_id', $checkout->id)->orderBy('id')->lockForUpdate()->get();
+
+        foreach ($orders as $order) {
+            if ($order->status !== Order::STATUS_PENDING) {
+                throw new InvalidStatusTransition("Pesanan {$order->order_code} sudah diproses sehingga tidak bisa dibatalkan.");
+            }
+
+            $order->update(['status' => Order::STATUS_DIBATALKAN]);
+            $this->log($order, Order::STATUS_PENDING, Order::STATUS_DIBATALKAN, self::actorTypeFor($actor), $actor, $note);
+        }
     }
 
     /**

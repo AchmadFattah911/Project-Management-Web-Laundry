@@ -122,7 +122,8 @@ class DatabaseSchemaTest extends TestCase
         $enum = fn (string $table, string $column) => DB::selectOne("SHOW COLUMNS FROM {$table} WHERE Field = ?", [$column])->Type;
 
         $this->assertSame("enum('admin','pegawai','pelanggan')", $enum('users', 'role'));
-        $this->assertSame("enum('pending','diproses','siap_diambil','selesai')", $enum('orders', 'status'));
+        // 'dibatalkan' ditambahkan di akhir (pembatalan online setelah bayar, tahap keuangan 6)
+        $this->assertSame("enum('pending','diproses','siap_diambil','selesai','dibatalkan')", $enum('orders', 'status'));
         $this->assertSame("enum('cuci','kering','lipat')", $enum('order_processes', 'process'));
         $this->assertSame("enum('pending','paid','failed','expired')", $enum('payments', 'status'));
         $this->assertSame("enum('cash','transfer','e-wallet')", $enum('payments', 'method'));

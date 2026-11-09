@@ -8,6 +8,8 @@
 <div class="px-4 py-4 space-y-4">
     @include('pelanggan.partials.nota', ['card' => $checkout])
 
+    @include('pelanggan.partials.cancel-paid')
+
     @if (in_array($checkout->status, \App\Models\Checkout::CLOSED_UNPAID, true))
         <form action="{{ route('pelanggan.pembayaran.reorder', $checkout) }}" method="POST" x-data="{ sending: false }" x-on:submit="if (sending) { $event.preventDefault(); return; } sending = true">
             @csrf

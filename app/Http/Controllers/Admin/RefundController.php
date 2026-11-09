@@ -3,8 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Exceptions\IdempotencyException;
 use App\Models\Payment;
+use App\Models\Refund;
+use App\Services\RefundService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -34,7 +39,54 @@ class RefundController extends Controller
             self::TAB_DONE => Payment::flagged()->whereNotNull('refunded_at')->count(),
         ];
 
-        return view('admin.refunds.index', compact('payments', 'counts', 'tab'));
+        // Pembatalan setelah bayar: refund manual menunggu transfer / refund API gagal, atau yang sudah selesai
+        $cancellations = app(RefundService::class)->paginateForAdmin(
+            $tab === self::TAB_OPEN ? [Refund::STATUS_PROCESSING, Refund::STATUS_FAILED] : [Refund::STATUS_DONE]
+        );
+        $counts[self::TAB_OPEN] += Refund::whereIn('status', [Refund::STATUS_PROCESSING, Refund::STATUS_FAILED])->count();
+        $counts[self::TAB_DONE] += Refund::where('status', Refund::STATUS_DONE)->count();
+
+        return view('admin.refunds.index', compact('payments', 'counts', 'tab', 'cancellations'));
+    }
+
+    /**
+     * Refund manual selesai: admin sudah transfer ke rekening pelanggan; bukti & catatan wajib.
+     */
+    public function completeCancellation(Request $request, Refund $refund, RefundService $refunds)
+    {
+        $validated = $request->validate([
+            'proof' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:' . (int) config('finance.expense.receipt_max_kb')],
+            'note'  => ['required', 'string', 'min:5', 'max:1000'],
+        ], [], ['proof' => 'bukti transfer', 'note' => 'catatan']);
+
+        try {
+            $refunds->completeManual($refund, $request->user(), $validated['proof'], trim($validated['note']));
+        } catch (InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Refund {$refund->checkout->code} ditandai selesai dan dicatat di ledger.");
+    }
+
+    public function retryCancellation(Request $request, Refund $refund, RefundService $refunds)
+    {
+        try {
+            $result = $refunds->retry($refund, $request->user());
+        } catch (InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return $result->status === Refund::STATUS_DONE
+            ? back()->with('success', "Refund {$refund->checkout->code} berhasil diproses Midtrans.")
+            : back()->with('error', "Refund {$refund->checkout->code} masih gagal: {$result->last_error}");
+    }
+
+    public function cancellationProof(Refund $refund)
+    {
+        $disk = Storage::disk((string) config('finance.expense.disk', 'local'));
+        abort_unless($refund->proof_path && $disk->exists($refund->proof_path), 404);
+
+        return $disk->response($refund->proof_path, null, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
     }
 
     public function markRefunded(Request $request, Payment $payment)

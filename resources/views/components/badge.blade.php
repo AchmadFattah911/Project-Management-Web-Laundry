@@ -24,6 +24,11 @@
             'dot'   => 'bg-emerald-500',
             'label' => 'Siap Diambil',
         ],
+        'dibatalkan' => [
+            'class' => 'bg-rose-50 text-rose-700 border-rose-200',
+            'dot'   => 'bg-rose-500',
+            'label' => 'Dibatalkan',
+        ],
         'selesai' => [
             'class' => 'bg-slate-100 text-slate-700 border-slate-300',
             'dot'   => 'bg-slate-500',

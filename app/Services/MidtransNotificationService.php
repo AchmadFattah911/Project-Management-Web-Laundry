@@ -51,6 +51,7 @@ class MidtransNotificationService
     public function __construct(
         protected OrderStateMachine $stateMachine,
         protected LedgerService $ledger,
+        protected RefundService $refunds,
     ) {}
 
     public function gateway(): MidtransGateway
@@ -170,7 +171,9 @@ class MidtransNotificationService
                     'failed'    => $this->applyClosed($owner, $locked, $status, Payment::STATUS_FAILED, Checkout::STATUS_FAILED, 'ditolak', $actorType, $actor),
                     'expired'   => $this->applyClosed($owner, $locked, $status, Payment::STATUS_EXPIRED, Checkout::STATUS_EXPIRED, 'kedaluwarsa', $actorType, $actor),
                     'cancelled' => $this->applyClosed($owner, $locked, $status, Payment::STATUS_EXPIRED, Checkout::STATUS_CANCELLED, null, $actorType, $actor),
-                    default     => self::RESULT_IGNORED,
+                    // Konfirmasi refund dari pembatalan setelah bayar (status checkout & payment tetap)
+                    default     => in_array($status['transaction_status'] ?? null, ['refund', 'partial_refund'], true)
+                        && $this->refunds->confirmFromGateway($locked, $status) ? self::RESULT_APPLIED : self::RESULT_IGNORED,
                 };
 
                 PaymentEvent::create([

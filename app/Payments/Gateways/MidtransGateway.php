@@ -110,6 +110,40 @@ class MidtransGateway implements PaymentGateway
     }
 
     /**
+     * Refund API Midtrans (POST /v2/{order_id}/refund, docs.midtrans.com/reference/refund-transaction).
+     * refund_key yang sama dipakai saat mencoba ulang agar Midtrans tidak me-refund dua kali.
+     *
+     * @return array{outcome: 'success'|'duplicate'|'rejected', body: array<string, mixed>, message: string}
+     *
+     * @throws RuntimeException  gagal koneksi / timeout / respons tidak bisa dibaca
+     */
+    public function refund(string $orderId, string $refundKey, int $amount, string $reason): array
+    {
+        try {
+            $response = $this->client()->post($this->apiBaseUrl() . '/v2/' . rawurlencode($orderId) . '/refund', [
+                'refund_key' => $refundKey,
+                'amount'     => $amount,
+                'reason'     => mb_substr($reason, 0, 250),
+            ]);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            throw new RuntimeException('Tidak bisa menghubungi Midtrans: ' . $e->getMessage(), previous: $e);
+        }
+
+        $body = (array) ($response->json() ?? []);
+        $code = (string) ($body['status_code'] ?? $response->status());
+
+        return [
+            'outcome' => match (true) {
+                $response->successful() && $code === '200' => 'success',
+                $code === '406'                             => 'duplicate',
+                default                                     => 'rejected',
+            },
+            'body'    => $body,
+            'message' => $this->errorMessage($response),
+        ];
+    }
+
+    /**
      * Menutup tagihan pending di Midtrans agar tidak bisa dibayar lagi. Tagihan yang belum punya transaksi
      * (404) dianggap sudah tertutup; Snap token-nya kedaluwarsa sendiri sesuai expiry.
      */

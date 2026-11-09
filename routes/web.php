@@ -101,6 +101,10 @@ Route::middleware(['auth', 'verified', 'role:admin'])
         // Pembayaran yang perlu direfund (nominal beda, bayar ganda, bayar setelah transaksi ditutup)
         Route::get('/perlu-refund', [AdminRefundController::class, 'index'])->name('refunds.index');
         Route::post('/perlu-refund/{payment}', [AdminRefundController::class, 'markRefunded'])->name('refunds.mark');
+        // Refund pembatalan setelah bayar (manual: tandai selesai dengan bukti; API gagal: coba ulang dengan refund_key sama)
+        Route::post('/perlu-refund/pembatalan/{refund}/selesai', [AdminRefundController::class, 'completeCancellation'])->middleware(['can:refund.process', 'throttle:20,1,admin.refund.complete:'])->name('refunds.cancellation.complete');
+        Route::post('/perlu-refund/pembatalan/{refund}/coba-lagi', [AdminRefundController::class, 'retryCancellation'])->middleware(['can:refund.process', 'throttle:10,1,admin.refund.retry:'])->name('refunds.cancellation.retry');
+        Route::get('/perlu-refund/pembatalan/{refund}/bukti', [AdminRefundController::class, 'cancellationProof'])->middleware('can:refund.process')->name('refunds.cancellation.proof');
 
         // Layanan Laundry
         Route::get('/services', [AdminServiceController::class, 'index'])->name('services.index');
@@ -147,6 +151,8 @@ Route::middleware(['auth', 'verified', 'role:pelanggan'])
         Route::get('/orders/{order}', [PelangganOrderController::class, 'show'])->name('orders.show');
         // Detail transaksi keranjang + timeline (milik orang lain → 404)
         Route::get('/transaksi/{checkout:code}', [PelangganTransactionController::class, 'show'])->name('transaksi.show');
+        // Batalkan transaksi online yang sudah dibayar (syarat dicek ulang di server; refund otomatis/manual)
+        Route::post('/transaksi/{checkout:code}/batal', [PelangganTransactionController::class, 'cancel'])->middleware('throttle:10,1,pelanggan.transaksi.cancel:')->name('transaksi.cancel');
         Route::post('/orders/{order}/pay', [PelangganOrderController::class, 'pay'])->name('orders.pay');
     });
 

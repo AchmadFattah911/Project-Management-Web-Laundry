@@ -14,7 +14,7 @@
     $badge = match ($group) {
         'diproses'    => ['primary', 'Diproses'],
         'selesai'     => ['success', 'Selesai'],
-        default       => ['danger', match ($card->status) {
+        default       => ['danger', $isCheckout && $card->isCancelledAfterPayment() ? 'Dibatalkan · Refund' : match ($card->status) {
             \App\Models\Checkout::STATUS_EXPIRED => 'Kedaluwarsa',
             \App\Models\Checkout::STATUS_FAILED  => 'Gagal',
             default                              => 'Dibatalkan',

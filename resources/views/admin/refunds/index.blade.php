@@ -119,4 +119,5 @@
         <div>{{ $payments->links() }}</div>
     @endif
 </div>
+@include('admin.refunds.partials.cancellations')
 @endsection

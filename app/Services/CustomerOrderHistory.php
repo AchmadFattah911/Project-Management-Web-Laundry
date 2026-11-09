@@ -73,7 +73,7 @@ class CustomerOrderHistory
     {
         if ($card instanceof Checkout) {
             return match (true) {
-                in_array($card->status, Checkout::CLOSED_UNPAID, true) => 'dibatalkan',
+                in_array($card->status, Checkout::CLOSED_UNPAID, true), $card->isCancelledAfterPayment() => 'dibatalkan',
                 $card->orders->isNotEmpty() && $card->orders->every(fn (Order $o) => $o->status === Order::STATUS_SELESAI) => 'selesai',
                 default => 'diproses',
             };
@@ -103,9 +103,10 @@ class CustomerOrderHistory
         return Checkout::query()
             ->where('user_id', $user->id)
             ->where('status', '!=', Checkout::STATUS_AWAITING)
-            ->when($tab === 'diproses', fn ($q) => $q->where('status', Checkout::STATUS_PAID)->whereHas('orders', $unfinished))
-            ->when($tab === 'selesai', fn ($q) => $q->where('status', Checkout::STATUS_PAID)->whereHas('orders')->whereDoesntHave('orders', $unfinished))
-            ->when($tab === 'dibatalkan', fn ($q) => $q->whereIn('status', Checkout::CLOSED_UNPAID));
+            ->when($tab === 'diproses', fn ($q) => $q->where('status', Checkout::STATUS_PAID)->where('refund_status', Checkout::REFUND_NONE)->whereHas('orders', $unfinished))
+            ->when($tab === 'selesai', fn ($q) => $q->where('status', Checkout::STATUS_PAID)->where('refund_status', Checkout::REFUND_NONE)->whereHas('orders')->whereDoesntHave('orders', $unfinished))
+            // Dibatalkan = ditutup sebelum bayar, atau dibatalkan pelanggan setelah bayar (refund)
+            ->when($tab === 'dibatalkan', fn ($q) => $q->where(fn ($q) => $q->whereIn('status', Checkout::CLOSED_UNPAID)->orWhere('refund_status', '!=', Checkout::REFUND_NONE)));
     }
 
     protected function standaloneOrders(User $user, string $tab): Builder

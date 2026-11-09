@@ -32,6 +32,8 @@ class Order extends Model
     public const STATUS_DIPROSES = 'diproses';
     public const STATUS_SIAP_DIAMBIL = 'siap_diambil';
     public const STATUS_SELESAI = 'selesai';
+    // Dibatalkan pelanggan setelah bayar (refund); bukan bagian alur maju di STATUSES
+    public const STATUS_DIBATALKAN = 'dibatalkan';
 
     /**
      * Alur status pesanan: pending → diproses → siap_diambil → selesai.
@@ -49,6 +51,7 @@ class Order extends Model
         self::STATUS_DIPROSES     => 'Diproses',
         self::STATUS_SIAP_DIAMBIL => 'Siap Diambil',
         self::STATUS_SELESAI      => 'Selesai',
+        self::STATUS_DIBATALKAN   => 'Dibatalkan',
     ];
 
     /**
