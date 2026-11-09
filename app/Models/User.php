@@ -48,6 +48,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'is_active' => 'boolean',
+            'deactivated_at' => 'datetime',
         ];
     }
 
@@ -74,6 +76,33 @@ class User extends Authenticatable
     public function isPelanggan(): bool
     {
         return $this->role === UserRole::PELANGGAN;
+    }
+
+    /**
+     * Permission per aksi dari config/permissions.php. Akun nonaktif tidak punya permission apa pun.
+     */
+    public function hasPermission(string $permission): bool
+    {
+        if (! $this->isActive()) {
+            return false;
+        }
+
+        $role = $this->role instanceof UserRole ? $this->role->value : (string) $this->role;
+
+        return in_array($permission, config("permissions.roles.{$role}", []), true);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->is_active !== false;
+    }
+
+    /**
+     * Pelanggan yang dibuat di outlet tanpa akun website (email placeholder, tidak bisa login).
+     */
+    public function isWalkIn(): bool
+    {
+        return $this->created_via === 'outlet';
     }
 
     /**

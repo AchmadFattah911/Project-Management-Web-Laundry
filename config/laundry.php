@@ -28,6 +28,9 @@ return [
     // Zona waktu outlet: batas hari di laporan keuangan (aplikasi menyimpan waktu dalam UTC).
     'report_timezone' => env('LAUNDRY_REPORT_TIMEZONE', 'Asia/Jakarta'),
 
+    // Zona waktu bisnis: tanggal bisnis ledger, shift, laporan harian/mingguan (ISO, Senin-Minggu)/bulanan.
+    'timezone' => env('LAUNDRY_TIMEZONE', env('LAUNDRY_REPORT_TIMEZONE', 'Asia/Jakarta')),
+
     // Metode pembayaran online (cashless) yang ditampilkan ke pelanggan.
     // key = nilai kolom payments.method, label = teks yang tampil di website.
     'online_payment_methods' => [

@@ -11,6 +11,7 @@ class Order extends Model
     protected $fillable = [
         'order_code',
         'checkout_id',
+        'channel',
         'user_id',
         'service_id',
         'service_name_snapshot',
@@ -23,6 +24,9 @@ class Order extends Model
         'notes',
         'status',
     ];
+
+    public const CHANNEL_ONLINE = 'online';
+    public const CHANNEL_OUTLET = 'outlet';
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_DIPROSES = 'diproses';

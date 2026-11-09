@@ -43,7 +43,8 @@ class PaymentService
 
     public function __construct(
         protected IdempotencyService $idempotency,
-        protected OrderStateMachine $stateMachine
+        protected OrderStateMachine $stateMachine,
+        protected LedgerService $ledger,
     ) {}
 
     /**
@@ -344,6 +345,7 @@ class PaymentService
             ]);
 
             $this->markOwnerPaid($payment, OrderStateMachine::ACTOR_WEBHOOK, note: "Lunas via {$payment->gateway} ({$payment->reference})");
+            $this->ledger->recordSale($payment);
         } elseif (in_array($notification->status, [Payment::STATUS_FAILED, Payment::STATUS_EXPIRED], true)
             && $payment->status === Payment::STATUS_PENDING) {
             $payment->update([
@@ -414,6 +416,7 @@ class PaymentService
             }
 
             $this->markOwnerPaid($payment, OrderStateMachine::ACTOR_ADMIN, $actor, "Dilunasi manual oleh admin ({$method})");
+            $this->ledger->recordSale($payment);
 
             return $payment;
         });
@@ -442,7 +445,7 @@ class PaymentService
         }
 
         try {
-            return $order->payments()->create([
+            $payment = $order->payments()->create([
                 'amount'          => $total,
                 'method'          => $method,
                 'gateway'         => Payment::GATEWAY_MANUAL,
@@ -459,6 +462,10 @@ class PaymentService
         } catch (UniqueConstraintViolationException) {
             throw new InvalidArgumentException('Nomor bukti ini sudah dipakai, atau form ini sudah tersimpan. Periksa daftar pesanan.');
         }
+
+        $this->ledger->recordSale($payment);
+
+        return $payment;
     }
 
     // ─────────────────────────────────────────────────────────────

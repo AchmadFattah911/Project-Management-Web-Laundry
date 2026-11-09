@@ -80,6 +80,8 @@ class CheckoutService
 
                 $checkout = Checkout::create([
                     'code'             => $this->generateCode(),
+                    // Checkout dari keranjang website selalu online (bukan dari input)
+                    'channel'          => Checkout::CHANNEL_ONLINE,
                     'user_id'          => $user->id,
                     'total_amount'     => 0,
                     'status'           => Checkout::STATUS_AWAITING,

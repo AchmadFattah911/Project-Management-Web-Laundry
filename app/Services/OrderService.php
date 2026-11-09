@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\UserRole;
+use App\Models\Checkout;
 use App\Models\Order;
 use App\Models\OrderProcess;
 use App\Models\Service;
@@ -49,9 +50,13 @@ class OrderService
             $customerName = $data['customer_name'] ?? ($user?->name ?? null);
             $customerPhone = $data['customer_phone'] ?? ($user?->phone ?? null);
 
+            $checkoutId = $data['checkout_id'] ?? null;
+
             $order = Order::create([
                 'order_code'     => $orderCode,
-                'checkout_id'    => $data['checkout_id'] ?? null,
+                'checkout_id'    => $checkoutId,
+                // Saluran ditentukan sistem: ikut transaksinya; pesanan tunggal hanya dibuat kasir (outlet)
+                'channel'        => $checkoutId ? Checkout::whereKey($checkoutId)->value('channel') : Order::CHANNEL_OUTLET,
                 'user_id'        => $userId,
                 'service_id'     => $service->id,
                 // Snapshot: perubahan nama/harga layanan nanti tidak mengubah pesanan ini

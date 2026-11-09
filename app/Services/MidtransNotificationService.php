@@ -50,6 +50,7 @@ class MidtransNotificationService
 
     public function __construct(
         protected OrderStateMachine $stateMachine,
+        protected LedgerService $ledger,
     ) {}
 
     public function gateway(): MidtransGateway
@@ -250,6 +251,8 @@ class MidtransNotificationService
             'paid_at' => $this->gatewayTime($status['settlement_time'] ?? null) ?? now(),
             'meta'    => $meta,
         ]);
+
+        $this->ledger->recordSale($payment);
 
         if ($owner instanceof Checkout) {
             $this->stateMachine->transitionCheckout($owner, Checkout::STATUS_PAID, $actorType, $actor,

@@ -50,6 +50,15 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        // Akun nonaktif (dinonaktifkan admin / digabung ke akun lain) tidak bisa masuk
+        if (! Auth::user()->isActive()) {
+            Auth::guard('web')->logout();
+
+            throw ValidationException::withMessages([
+                'email' => 'Akun ini sudah dinonaktifkan. Hubungi admin Laundry Coin.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

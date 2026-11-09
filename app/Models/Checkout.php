@@ -12,6 +12,9 @@ use Illuminate\Support\Carbon;
  */
 class Checkout extends Model
 {
+    public const CHANNEL_ONLINE = 'online';
+    public const CHANNEL_OUTLET = 'outlet';
+
     public const STATUS_AWAITING = 'menunggu_pembayaran';
     public const STATUS_PAID = 'lunas';
     public const STATUS_FAILED = 'gagal';
@@ -26,6 +29,7 @@ class Checkout extends Model
 
     protected $fillable = [
         'code',
+        'channel',
         'user_id',
         'total_amount',
         'status',
