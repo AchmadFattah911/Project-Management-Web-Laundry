@@ -17,6 +17,11 @@ class ClosedPeriodService
 {
     public function __construct(protected AuditLogger $audit) {}
 
+    public function paginate(int $perPage = 20): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        return ClosedPeriod::with('closer:id,name')->latest('period_end')->paginate($perPage);
+    }
+
     public function isClosed(string $businessDate): bool
     {
         return ClosedPeriod::where('period_start', '<=', $businessDate)

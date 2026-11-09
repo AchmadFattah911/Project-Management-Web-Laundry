@@ -10,6 +10,8 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\Panel\CustomerController as PanelCustomerController;
 use App\Http\Controllers\Panel\ExpenseController as PanelExpenseController;
+use App\Http\Controllers\Panel\PeriodController as PanelPeriodController;
+use App\Http\Controllers\Panel\ReportController as PanelReportController;
 use App\Http\Controllers\Panel\ShiftController as PanelShiftController;
 use App\Http\Controllers\Panel\TransactionController as PanelTransactionController;
 use App\Http\Controllers\Panel\VoidController as PanelVoidController;
@@ -239,6 +241,11 @@ Route::middleware(['auth', 'verified', 'role:admin,pegawai'])
         Route::post('/pengeluaran/{expense}/tolak', [PanelExpenseController::class, 'reject'])->middleware(['can:pengeluaran.approve', 'throttle:30,1,panel.pengeluaran.reject:'])->name('pengeluaran.reject');
         Route::post('/pengeluaran-kategori', [PanelExpenseController::class, 'storeCategory'])->middleware(['can:pengeluaran.kategori.manage', 'throttle:20,1,panel.pengeluaran.kategori:'])->name('pengeluaran.category.store');
         Route::post('/pengeluaran-kategori/{category}/toggle', [PanelExpenseController::class, 'toggleCategory'])->middleware(['can:pengeluaran.kategori.manage', 'throttle:20,1,panel.pengeluaran.kategori.toggle:'])->name('pengeluaran.category.toggle');
+
+        // Laporan keuangan & tutup buku (admin)
+        Route::get('/laporan', [PanelReportController::class, 'index'])->middleware(['can:laporan.view', 'throttle:60,1,panel.laporan:'])->name('laporan.index');
+        Route::get('/tutup-buku', [PanelPeriodController::class, 'index'])->middleware('can:periode.close')->name('periode.index');
+        Route::post('/tutup-buku', [PanelPeriodController::class, 'store'])->middleware(['can:periode.close', 'throttle:10,1,panel.periode.store:'])->name('periode.store');
 
         // Persetujuan void (admin)
         Route::get('/void', [PanelVoidController::class, 'index'])->middleware('can:transaksi.void.approve')->name('void.index');
