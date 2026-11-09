@@ -9,6 +9,7 @@ use App\Http\Controllers\DummyCheckoutController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\Panel\CustomerController as PanelCustomerController;
+use App\Http\Controllers\Panel\ExpenseController as PanelExpenseController;
 use App\Http\Controllers\Panel\ShiftController as PanelShiftController;
 use App\Http\Controllers\Panel\TransactionController as PanelTransactionController;
 use App\Http\Controllers\Panel\VoidController as PanelVoidController;
@@ -223,6 +224,15 @@ Route::middleware(['auth', 'verified', 'role:admin,pegawai'])
         Route::get('/shift/{shift}', [PanelShiftController::class, 'show'])->middleware('can:shift.view_own')->name('shift.show');
         Route::post('/shift/{shift}/tutup', [PanelShiftController::class, 'close'])->middleware(['can:shift.close', 'throttle:10,1,panel.shift.close:'])->name('shift.close');
         Route::post('/shift/{shift}/verifikasi', [PanelShiftController::class, 'verify'])->middleware(['can:shift.verify', 'throttle:30,1,panel.shift.verify:'])->name('shift.verify');
+
+        // Pengeluaran operasional
+        Route::get('/pengeluaran', [PanelExpenseController::class, 'index'])->middleware('can:pengeluaran.view_own')->name('pengeluaran.index');
+        Route::post('/pengeluaran', [PanelExpenseController::class, 'store'])->middleware(['can:pengeluaran.create', 'throttle:20,1,panel.pengeluaran.store:'])->name('pengeluaran.store');
+        Route::get('/pengeluaran/{expense}/nota', [PanelExpenseController::class, 'receipt'])->middleware('can:pengeluaran.view_own')->name('pengeluaran.receipt');
+        Route::post('/pengeluaran/{expense}/setujui', [PanelExpenseController::class, 'approve'])->middleware(['can:pengeluaran.approve', 'throttle:30,1,panel.pengeluaran.approve:'])->name('pengeluaran.approve');
+        Route::post('/pengeluaran/{expense}/tolak', [PanelExpenseController::class, 'reject'])->middleware(['can:pengeluaran.approve', 'throttle:30,1,panel.pengeluaran.reject:'])->name('pengeluaran.reject');
+        Route::post('/pengeluaran-kategori', [PanelExpenseController::class, 'storeCategory'])->middleware(['can:pengeluaran.kategori.manage', 'throttle:20,1,panel.pengeluaran.kategori:'])->name('pengeluaran.category.store');
+        Route::post('/pengeluaran-kategori/{category}/toggle', [PanelExpenseController::class, 'toggleCategory'])->middleware(['can:pengeluaran.kategori.manage', 'throttle:20,1,panel.pengeluaran.kategori.toggle:'])->name('pengeluaran.category.toggle');
 
         // Persetujuan void (admin)
         Route::get('/void', [PanelVoidController::class, 'index'])->middleware('can:transaksi.void.approve')->name('void.index');
