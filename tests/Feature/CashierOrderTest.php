@@ -248,34 +248,4 @@ class CashierOrderTest extends TestCase
         $this->actingAs($admin)->post(route('admin.orders.store'), $this->form())->assertSessionHas('success');
         $this->assertSame($admin->id, Payment::sole()->meta['confirmed_by']);
     }
-
-    public function test_laporan_menampilkan_petugas_bukti_dan_temuan_tanpa_bukti(): void
-    {
-        $this->pegawai->update(['name' => 'Kasir Andi']);
-        $this->submit();
-        $this->submit(['payment_method' => 'transfer', 'payment_reference' => 'BCA-77']);
-
-        $legacy = $this->makeOrder(null, $this->service, ['customer_name' => 'Lama', 'total_price' => 15000]);
-        $legacy->payments()->create([
-            'amount' => 15000, 'method' => 'transfer', 'gateway' => 'manual',
-            'status' => 'paid', 'paid_at' => now(), 'meta' => ['confirmed_by' => $this->pegawai->id],
-        ]);
-
-        $response = $this->actingAs($this->pegawai)->get(route('pegawai.keuangan.index', ['kanal' => 'kasir']))
-            ->assertSee('Diterima Petugas Siapa?')
-            ->assertSee('Tanpa bukti')
-            ->assertSee('BCA-77')
-            ->assertSee('Terima Rp 50.000, kembali Rp 10.000');
-
-        $report = $response->viewData('report');
-
-        $this->assertSame('Lama', $report['unproven']->sole()['customer']);
-        $this->assertSame(95000.0, $report['cashiers']->sole()['total']);
-        $this->assertSame('Kasir Andi', $report['cashiers']->sole()['label']);
-        $this->assertStringContainsString('Tunai Rp 40.000', $report['cashiers']->sole()['hint']);
-
-        $csv = $this->actingAs($this->pegawai)->get(route('pegawai.keuangan.export', ['kanal' => 'kasir']))->streamedContent();
-
-        $this->assertStringContainsString('"Kasir Andi";50000;10', $csv);
-    }
 }

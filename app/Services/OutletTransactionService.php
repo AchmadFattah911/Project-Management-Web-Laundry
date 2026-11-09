@@ -53,7 +53,7 @@ class OutletTransactionService
                     ? $this->activeCustomer($data->customerId)
                     : $this->customers->createWalkIn($data->newCustomer, $actor);
 
-                $shift = $data->paysNow() && $data->method === 'cash' ? $this->shifts->lockActiveFor($actor) : null;
+                $shift = $data->paysNow() ? $this->shiftFor($actor, $data->method) : null;
 
                 $checkout = Checkout::create([
                     'code'             => $this->generateCode(),
@@ -171,7 +171,7 @@ class OutletTransactionService
             }
 
             $this->assertEditableState($locked);
-            $shift = $method === 'cash' ? $this->shifts->lockActiveFor($actor) : null;
+            $shift = $this->shiftFor($actor, $method);
 
             return $this->settleLocked($locked, $method, $cashReceived, $reference, $actor, $shift, $token);
         });
@@ -230,6 +230,14 @@ class OutletTransactionService
         ], null, $actor);
 
         return $payment;
+    }
+
+    /**
+     * Tunai wajib shift aktif (dikunci). Non-tunai ikut dicatat ke shift aktif jika ada, untuk ringkasan shift.
+     */
+    protected function shiftFor(User $actor, string $method): ?CashShift
+    {
+        return $method === 'cash' ? $this->shifts->lockActiveFor($actor) : $this->shifts->activeFor($actor);
     }
 
     protected function lockEditable(Checkout $checkout): Checkout

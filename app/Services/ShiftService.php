@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CashShift;
 use App\Models\FinancialEntry;
 use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -17,6 +18,19 @@ use InvalidArgumentException;
 class ShiftService
 {
     public function __construct(protected AuditLogger $audit) {}
+
+    /**
+     * Riwayat shift: milik sendiri, atau semua petugas untuk yang berhak (shift.view_all).
+     */
+    public function paginate(User $viewer, ?string $status = null, int $perPage = 15): LengthAwarePaginator
+    {
+        return CashShift::with(['user:id,name', 'verifier:id,name'])
+            ->when(! $viewer->hasPermission('shift.view_all'), fn ($q) => $q->where('user_id', $viewer->id))
+            ->when(array_key_exists((string) $status, CashShift::STATUS_LABELS), fn ($q) => $q->where('status', $status))
+            ->latest('opened_at')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
 
     public function activeFor(User $user): ?CashShift
     {
@@ -63,6 +77,16 @@ class ShiftService
 
             throw new InvalidArgumentException('Anda masih punya shift yang belum ditutup. Tutup shift tersebut sebelum membuka shift baru.');
         }
+    }
+
+    /**
+     * Entri ledger yang terikat ke shift (rincian di halaman shift).
+     *
+     * @return \Illuminate\Support\Collection<int, FinancialEntry>
+     */
+    public function entries(CashShift $shift): \Illuminate\Support\Collection
+    {
+        return FinancialEntry::with('checkout:id,code')->where('shift_id', $shift->id)->orderBy('id')->get();
     }
 
     /**

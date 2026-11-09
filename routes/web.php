@@ -9,6 +9,7 @@ use App\Http\Controllers\DummyCheckoutController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\Panel\CustomerController as PanelCustomerController;
+use App\Http\Controllers\Panel\ShiftController as PanelShiftController;
 use App\Http\Controllers\Panel\TransactionController as PanelTransactionController;
 use App\Http\Controllers\Panel\VoidController as PanelVoidController;
 use App\Http\Controllers\PaymentWebhookController;
@@ -126,6 +127,7 @@ Route::middleware(['auth', 'verified', 'role:pegawai'])
         Route::put('/orders/process/{process}', [PegawaiOrderController::class, 'updateProcess'])->name('orders.process');
 
         // Audit & rekap keuangan (hanya baca)
+        // Laporan keuangan kini hanya admin (panel.laporan.*); URL lama diarahkan ke ringkasan shift milik pegawai
         Route::get('/keuangan', [PegawaiFinanceController::class, 'index'])->name('keuangan.index');
         Route::get('/keuangan/export', [PegawaiFinanceController::class, 'export'])->name('keuangan.export');
     });
@@ -214,6 +216,13 @@ Route::middleware(['auth', 'verified', 'role:admin,pegawai'])
         Route::post('/transaksi/{checkout}/lunasi', [PanelTransactionController::class, 'settle'])->middleware(['can:transaksi.outlet.settle', 'throttle:30,1,panel.transaksi.settle:'])->name('transaksi.settle');
         Route::post('/transaksi/{checkout}/void', [PanelVoidController::class, 'store'])->middleware(['can:transaksi.void.request', 'throttle:10,1,panel.transaksi.void:'])->name('transaksi.void');
         Route::put('/pesanan/{order}/status', [PanelTransactionController::class, 'updateOrderStatus'])->middleware(['can:transaksi.status.update', 'throttle:60,1,panel.pesanan.status:'])->name('transaksi.order-status');
+
+        // Kas harian / shift
+        Route::get('/shift', [PanelShiftController::class, 'index'])->middleware('can:shift.view_own')->name('shift.index');
+        Route::post('/shift', [PanelShiftController::class, 'open'])->middleware(['can:shift.open', 'throttle:10,1,panel.shift.open:'])->name('shift.open');
+        Route::get('/shift/{shift}', [PanelShiftController::class, 'show'])->middleware('can:shift.view_own')->name('shift.show');
+        Route::post('/shift/{shift}/tutup', [PanelShiftController::class, 'close'])->middleware(['can:shift.close', 'throttle:10,1,panel.shift.close:'])->name('shift.close');
+        Route::post('/shift/{shift}/verifikasi', [PanelShiftController::class, 'verify'])->middleware(['can:shift.verify', 'throttle:30,1,panel.shift.verify:'])->name('shift.verify');
 
         // Persetujuan void (admin)
         Route::get('/void', [PanelVoidController::class, 'index'])->middleware('can:transaksi.void.approve')->name('void.index');
