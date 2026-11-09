@@ -197,7 +197,7 @@ class SnapPaymentService
         $query = Checkout::whereKey($checkout->id);
         $locked = ($lock ? $query->lockForUpdate() : $query)->firstOrFail();
 
-        if ((int) $locked->user_id !== (int) $user->id) {
+        if ((int) $locked->user_id !== (int) $user->id || $locked->isOutlet()) {
             throw new InvalidArgumentException('Transaksi tidak ditemukan.');
         }
 

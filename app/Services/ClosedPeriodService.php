@@ -43,8 +43,8 @@ class ClosedPeriodService
             throw new InvalidArgumentException('Tanggal akhir tidak boleh sebelum tanggal awal.');
         }
 
-        if ($to->toDateString() >= BusinessCalendar::today()) {
-            throw new InvalidArgumentException('Hanya periode yang sudah lewat yang bisa ditutup buku.');
+        if ($to->toDateString() > BusinessCalendar::today()) {
+            throw new InvalidArgumentException('Periode yang belum terjadi tidak bisa ditutup buku.');
         }
 
         return DB::transaction(function () use ($from, $to, $actor, $note) {

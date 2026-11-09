@@ -20,7 +20,7 @@ class TransactionController extends Controller
         $this->authorize('view', $checkout);
 
         // Belum dibayar tidak punya nota: lanjutkan atau batalkan di halaman pembayaran
-        if ($checkout->isAwaitingPayment()) {
+        if ($checkout->isAwaitingPayment() && ! $checkout->isOutlet()) {
             return redirect()->route('pelanggan.pembayaran.show', $checkout);
         }
 

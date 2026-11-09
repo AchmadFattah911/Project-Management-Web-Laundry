@@ -53,7 +53,7 @@ class CheckoutController extends Controller
 
     public function show(Request $request, Checkout $checkout)
     {
-        $this->authorize('view', $checkout);
+        $this->authorize('pay', $checkout);
 
         // Sudah lunas: tidak ada lagi yang perlu dibayar, langsung ke halaman setelah pembayaran
         if ($checkout->isPaid()) {
@@ -83,7 +83,7 @@ class CheckoutController extends Controller
      */
     public function finished(Request $request, Checkout $checkout)
     {
-        $this->authorize('view', $checkout);
+        $this->authorize('pay', $checkout);
 
         if (! $checkout->isPaid()) {
             return redirect()->route('pelanggan.pembayaran.show', $checkout)
@@ -114,7 +114,7 @@ class CheckoutController extends Controller
      */
     public function status(Checkout $checkout)
     {
-        $this->authorize('view', $checkout);
+        $this->authorize('pay', $checkout);
 
         $payment = $checkout->paymentForDisplay();
 
@@ -133,7 +133,7 @@ class CheckoutController extends Controller
      */
     public function pay(Request $request, Checkout $checkout)
     {
-        $this->authorize('view', $checkout);
+        $this->authorize('pay', $checkout);
 
         // Transaksi yang dibatalkan / kedaluwarsa / gagal tidak bisa dibayar lagi (berlaku juga untuk gateway lama)
         if (! $checkout->isAwaitingPayment() && ! $checkout->isPaid()) {
@@ -209,7 +209,7 @@ class CheckoutController extends Controller
      */
     public function cancel(Request $request, Checkout $checkout)
     {
-        $this->authorize('view', $checkout);
+        $this->authorize('pay', $checkout);
 
         try {
             $this->snapPayments->cancel($checkout, $request->user());
@@ -226,7 +226,7 @@ class CheckoutController extends Controller
      */
     public function popupClosed(Checkout $checkout)
     {
-        $this->authorize('view', $checkout);
+        $this->authorize('pay', $checkout);
 
         $this->snapPayments->markPopupClosed($checkout);
 
@@ -239,7 +239,7 @@ class CheckoutController extends Controller
      */
     public function reorder(Request $request, Checkout $checkout)
     {
-        $this->authorize('view', $checkout);
+        $this->authorize('pay', $checkout);
 
         try {
             $result = $this->cartService->reorderFromCheckout($request->user(), $checkout);

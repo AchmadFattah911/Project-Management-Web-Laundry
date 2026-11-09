@@ -9,6 +9,8 @@ use App\Http\Controllers\DummyCheckoutController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderTrackingController;
 use App\Http\Controllers\Panel\CustomerController as PanelCustomerController;
+use App\Http\Controllers\Panel\TransactionController as PanelTransactionController;
+use App\Http\Controllers\Panel\VoidController as PanelVoidController;
 use App\Http\Controllers\PaymentWebhookController;
 use App\Http\Controllers\Pegawai\DashboardController as PegawaiDashboardController;
 use App\Http\Controllers\Pegawai\FinanceController as PegawaiFinanceController;
@@ -201,6 +203,22 @@ Route::middleware(['auth', 'verified', 'role:admin,pegawai'])
         Route::put('/pelanggan/{customer}', [PanelCustomerController::class, 'update'])->middleware(['can:pelanggan.update', 'throttle:30,1,panel.pelanggan.update:'])->name('pelanggan.update');
         Route::post('/pelanggan/{customer}/nonaktif', [PanelCustomerController::class, 'deactivate'])->middleware(['can:pelanggan.deactivate', 'throttle:20,1,panel.pelanggan.nonaktif:'])->name('pelanggan.deactivate');
         Route::post('/pelanggan/{customer}/aktifkan', [PanelCustomerController::class, 'activate'])->middleware(['can:pelanggan.deactivate', 'throttle:20,1,panel.pelanggan.aktifkan:'])->name('pelanggan.activate');
+
+        // Transaksi: tab Outlet (CRU + void) dan tab Aplikasi (hanya lunas, baca + status pengerjaan)
+        Route::get('/transaksi', [PanelTransactionController::class, 'index'])->name('transaksi.index');
+        Route::get('/transaksi/baru', [PanelTransactionController::class, 'create'])->middleware('can:transaksi.outlet.create')->name('transaksi.create');
+        Route::post('/transaksi', [PanelTransactionController::class, 'store'])->middleware(['can:transaksi.outlet.create', 'throttle:30,1,panel.transaksi.store:'])->name('transaksi.store');
+        Route::get('/transaksi/{checkout}', [PanelTransactionController::class, 'show'])->name('transaksi.show');
+        Route::get('/transaksi/{checkout}/struk', [PanelTransactionController::class, 'receipt'])->name('transaksi.receipt');
+        Route::put('/transaksi/{checkout}', [PanelTransactionController::class, 'update'])->middleware(['can:transaksi.outlet.update', 'throttle:30,1,panel.transaksi.update:'])->name('transaksi.update');
+        Route::post('/transaksi/{checkout}/lunasi', [PanelTransactionController::class, 'settle'])->middleware(['can:transaksi.outlet.settle', 'throttle:30,1,panel.transaksi.settle:'])->name('transaksi.settle');
+        Route::post('/transaksi/{checkout}/void', [PanelVoidController::class, 'store'])->middleware(['can:transaksi.void.request', 'throttle:10,1,panel.transaksi.void:'])->name('transaksi.void');
+        Route::put('/pesanan/{order}/status', [PanelTransactionController::class, 'updateOrderStatus'])->middleware(['can:transaksi.status.update', 'throttle:60,1,panel.pesanan.status:'])->name('transaksi.order-status');
+
+        // Persetujuan void (admin)
+        Route::get('/void', [PanelVoidController::class, 'index'])->middleware('can:transaksi.void.approve')->name('void.index');
+        Route::post('/void/{voidRequest}/setujui', [PanelVoidController::class, 'approve'])->middleware(['can:transaksi.void.approve', 'throttle:30,1,panel.void.approve:'])->name('void.approve');
+        Route::post('/void/{voidRequest}/tolak', [PanelVoidController::class, 'reject'])->middleware(['can:transaksi.void.approve', 'throttle:30,1,panel.void.reject:'])->name('void.reject');
     });
 
 // ─────────────────────────────────────────────

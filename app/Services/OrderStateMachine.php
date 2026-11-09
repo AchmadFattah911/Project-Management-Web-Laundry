@@ -17,14 +17,17 @@ use Illuminate\Support\Facades\Log;
  * Setiap perubahan dicatat di order_status_logs dalam transaksi DB yang sama.
  *
  * Transaksi (status pembayaran):
- *   menunggu_pembayaran → lunas       hanya dari gateway (webhook / rekonsiliasi) atau pelunasan manual admin
+ *   menunggu_pembayaran → lunas       dari gateway (webhook / rekonsiliasi), pelunasan manual admin,
+ *                                     atau kasir (pegawai) khusus transaksi outlet
  *   menunggu_pembayaran → gagal       gateway
  *   menunggu_pembayaran → kadaluarsa  gateway / scheduler
  *   menunggu_pembayaran → dibatalkan  pelanggan / gateway (cancel)
  *   lunas, gagal, kadaluarsa, dibatalkan = final
  *
  * Pesanan (status pengerjaan): pending → diproses → siap_diambil → selesai
- *   - hanya admin/pegawai, dan hanya setelah lunas;
+ *   - hanya admin/pegawai, dan hanya setelah lunas (kecuali outlet "bayar saat ambil": boleh dikerjakan
+ *     sebelum lunas, tetapi baru boleh selesai/diambil setelah lunas);
+ *   - transaksi yang sudah di-void tidak bisa dikerjakan lagi;
  *   - maju boleh melompat; selesai = final;
  *   - mundur hanya admin dengan catatan wajib (koreksi salah input), termasuk dari selesai
  *     selama CORRECTION_WINDOW_HOURS sejak ditandai selesai.
@@ -45,7 +48,7 @@ class OrderStateMachine
     /** to => siapa saja yang boleh memindahkan transaksi ke status itu (dari menunggu_pembayaran). */
     public const CHECKOUT_TRANSITIONS = [
         Checkout::STATUS_AWAITING => [
-            Checkout::STATUS_PAID    => [self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE, self::ACTOR_ADMIN],
+            Checkout::STATUS_PAID    => [self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE, self::ACTOR_ADMIN, self::ACTOR_PEGAWAI],
             Checkout::STATUS_FAILED  => [self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE],
             Checkout::STATUS_EXPIRED => [self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE, self::ACTOR_SCHEDULER],
             Checkout::STATUS_CANCELLED => [self::ACTOR_PELANGGAN, self::ACTOR_WEBHOOK, self::ACTOR_RECONCILE],
@@ -85,7 +88,8 @@ class OrderStateMachine
                 throw new InvalidStatusTransition("Transaksi {$locked->code} tidak bisa diubah dari '{$from}' ke '{$to}'.");
             }
 
-            if (! in_array($actorType, $allowedActors, true)) {
+            // Pegawai hanya melunasi transaksi outlet di kasir; transaksi online hanya lunas dari gateway/admin
+            if (! in_array($actorType, $allowedActors, true) || ($actorType === self::ACTOR_PEGAWAI && ! $locked->isOutlet())) {
                 throw new InvalidStatusTransition("Status '{$to}' untuk transaksi {$locked->code} tidak boleh diset oleh {$actorType}.");
             }
 
@@ -138,9 +142,21 @@ class OrderStateMachine
                     : "Pesanan {$locked->order_code} sudah selesai, statusnya tidak bisa diubah lagi.");
             }
 
-            // Bayar dulu baru dikerjakan
+            $checkout = $locked->checkout;
+
+            if ($checkout?->isVoided()) {
+                throw new InvalidStatusTransition("Transaksi {$checkout->code} sudah di-void, pesanan tidak bisa dikerjakan.");
+            }
+
+            // Bayar dulu baru dikerjakan; outlet "bayar saat ambil" boleh dikerjakan, tetapi diambil setelah lunas
             if (! $locked->isPaid()) {
-                throw new InvalidStatusTransition("Pesanan {$locked->order_code} belum dibayar sehingga belum bisa dikerjakan.");
+                if (! $checkout?->allowsWorkBeforePayment()) {
+                    throw new InvalidStatusTransition("Pesanan {$locked->order_code} belum dibayar sehingga belum bisa dikerjakan.");
+                }
+
+                if ($to === Order::STATUS_SELESAI) {
+                    throw new InvalidStatusTransition("Pesanan {$locked->order_code} belum dilunasi. Lunasi transaksi {$checkout->code} sebelum cucian diambil.");
+                }
             }
 
             $note = $this->cleanNote($note);

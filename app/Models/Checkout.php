@@ -15,6 +15,9 @@ class Checkout extends Model
     public const CHANNEL_ONLINE = 'online';
     public const CHANNEL_OUTLET = 'outlet';
 
+    public const TIMING_NOW = 'now';
+    public const TIMING_ON_PICKUP = 'on_pickup';
+
     public const STATUS_AWAITING = 'menunggu_pembayaran';
     public const STATUS_PAID = 'lunas';
     public const STATUS_FAILED = 'gagal';
@@ -31,6 +34,10 @@ class Checkout extends Model
         'code',
         'channel',
         'user_id',
+        'created_by',
+        'payment_timing',
+        'outlet_method',
+        'shift_id',
         'total_amount',
         'status',
         'payment_deadline',
@@ -62,6 +69,41 @@ class Checkout extends Model
     public function orders()
     {
         return $this->hasMany(Order::class);
+    }
+
+    /** Petugas yang membuat transaksi outlet. */
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(CashShift::class, 'shift_id');
+    }
+
+    public function voidRequests()
+    {
+        return $this->hasMany(VoidRequest::class)->latest('id');
+    }
+
+    public function isOutlet(): bool
+    {
+        return $this->channel === self::CHANNEL_OUTLET;
+    }
+
+    /** Void disetujui (transaksi asli tidak diubah; lihat void_requests & ledger void_reversal). */
+    public function isVoided(): bool
+    {
+        return $this->relationLoaded('voidRequests')
+            ? $this->voidRequests->contains('status', VoidRequest::STATUS_APPROVED)
+            : $this->voidRequests()->where('status', VoidRequest::STATUS_APPROVED)->exists();
+    }
+
+    /** Transaksi outlet "bayar saat ambil": cucian boleh dikerjakan sebelum lunas, diambil setelah lunas. */
+    public function allowsWorkBeforePayment(): bool
+    {
+        return $this->isOutlet() && $this->payment_timing === self::TIMING_ON_PICKUP && $this->isAwaitingPayment();
     }
 
     /**

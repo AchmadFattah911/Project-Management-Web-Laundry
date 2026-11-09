@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\PaymentGateway;
 use App\Exceptions\IdempotencyException;
+use App\Models\CashShift;
 use App\Models\Checkout;
 use App\Models\Order;
 use App\Models\Payment;
@@ -444,6 +445,9 @@ class PaymentService
             throw new InvalidArgumentException('Nomor bukti transaksi wajib diisi untuk pembayaran non-tunai.');
         }
 
+        // Jalur kasir lama: tunai dicatat ke shift aktif petugas jika ada (tidak diwajibkan agar route lama tetap jalan)
+        $shift = $isCash ? CashShift::where('user_id', $actor->id)->where('status', CashShift::STATUS_OPEN)->first() : null;
+
         try {
             $payment = $order->payments()->create([
                 'amount'          => $total,
@@ -457,6 +461,7 @@ class PaymentService
                     'confirmed_by'  => $actor->id,
                     'cash_received' => $isCash ? $cashReceived : null,
                     'change'        => $isCash ? $cashReceived - $total : null,
+                    'shift_id'      => $shift?->id,
                 ], fn ($value) => $value !== null),
             ]);
         } catch (UniqueConstraintViolationException) {

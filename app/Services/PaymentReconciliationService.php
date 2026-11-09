@@ -72,7 +72,9 @@ class PaymentReconciliationService
         $cutoff = now()->subMinutes($graceMinutes);
         $legacyCutoff = $cutoff->copy()->subMinutes((int) config('payment.expiry_minutes', 60));
 
+        // Hanya transaksi online: transaksi outlet "bayar saat ambil" tidak punya batas bayar
         $checkouts = Checkout::where('status', Checkout::STATUS_AWAITING)
+            ->where('channel', Checkout::CHANNEL_ONLINE)
             ->where(fn ($q) => $q->where('payment_deadline', '<', $cutoff)
                 ->orWhere(fn ($q) => $q->whereNull('payment_deadline')->where('created_at', '<', $legacyCutoff)))
             ->orderBy('id')

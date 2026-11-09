@@ -225,7 +225,8 @@ class OrderService
      */
     protected function assertPaid(Order $order): void
     {
-        if (! $order->isPaid()) {
+        // Outlet "bayar saat ambil" boleh dikerjakan sebelum lunas
+        if (! $order->isPaid() && ! $order->checkout?->allowsWorkBeforePayment()) {
             throw new InvalidArgumentException("Pesanan {$order->order_code} belum dibayar sehingga belum bisa dikerjakan.");
         }
     }

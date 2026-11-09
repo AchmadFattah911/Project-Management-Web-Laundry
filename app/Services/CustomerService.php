@@ -39,36 +39,45 @@ class CustomerService
             scope: 'customer-create',
             user: $actor,
             payload: $data->toArray(),
-            callback: fn () => DB::transaction(function () use ($data, $actor) {
-                $this->assertPhoneAvailable($data->phoneE164);
-
-                $customer = new User([
-                    'name'     => $data->name,
-                    'email'    => 'walkin-' . Str::lower((string) Str::ulid()) . '@' . self::WALK_IN_EMAIL_DOMAIN,
-                    'password' => Str::random(48),
-                    'phone'    => $data->localPhone(),
-                ]);
-                $customer->forceFill([
-                    'role'           => UserRole::PELANGGAN,
-                    'phone_e164'     => $data->phoneE164,
-                    'customer_notes' => $data->notes,
-                    'created_via'    => 'outlet',
-                    'is_active'      => true,
-                ]);
-
-                try {
-                    $customer->save();
-                } catch (UniqueConstraintViolationException) {
-                    throw new InvalidArgumentException('Nomor HP ini sudah terdaftar untuk pelanggan lain.');
-                }
-
-                $this->audit->log('pelanggan.create', $customer, null, $this->snapshot($customer), null, $actor);
-
-                return ['user_id' => $customer->id];
-            }),
+            callback: fn () => ['user_id' => $this->createWalkIn($data, $actor)->id],
         );
 
         return ['customer' => User::findOrFail($result['response']['user_id']), 'replayed' => $result['replayed']];
+    }
+
+    /**
+     * Buat akun pelanggan walk-in (tanpa idempotency; dipanggil di dalam transaksi DB pemanggil,
+     * mis. "tambah cepat pelanggan" di form transaksi outlet).
+     */
+    public function createWalkIn(CustomerData $data, User $actor): User
+    {
+        return DB::transaction(function () use ($data, $actor) {
+            $this->assertPhoneAvailable($data->phoneE164);
+
+            $customer = new User([
+                'name'     => $data->name,
+                'email'    => 'walkin-' . Str::lower((string) Str::ulid()) . '@' . self::WALK_IN_EMAIL_DOMAIN,
+                'password' => Str::random(48),
+                'phone'    => $data->localPhone(),
+            ]);
+            $customer->forceFill([
+                'role'           => UserRole::PELANGGAN,
+                'phone_e164'     => $data->phoneE164,
+                'customer_notes' => $data->notes,
+                'created_via'    => 'outlet',
+                'is_active'      => true,
+            ]);
+
+            try {
+                $customer->save();
+            } catch (UniqueConstraintViolationException) {
+                throw new InvalidArgumentException('Nomor HP ini sudah terdaftar untuk pelanggan lain.');
+            }
+
+            $this->audit->log('pelanggan.create', $customer, null, $this->snapshot($customer), null, $actor);
+
+            return $customer;
+        });
     }
 
     public function update(User $customer, CustomerData $data, User $actor): User
